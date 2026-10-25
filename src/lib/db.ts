@@ -8,7 +8,7 @@ interface QueryResult<T = any> {
   rowCount?: number | null;
 }
 
-interface DBClient {
+export interface DBClient {
   query<T = any>(sql: string, params?: any[]): Promise<QueryResult<T>>;
   exec(sql: string): Promise<void>;
   engine: 'pg' | 'pglite';

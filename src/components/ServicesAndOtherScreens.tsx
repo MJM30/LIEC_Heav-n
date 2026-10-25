@@ -2095,23 +2095,28 @@ export function RapportsFinanceScreen({
 
 export function ParametresGovernanceScreen({
   auditLogs = [],
-  dbEngine,
+  dbEngine = 'postgresql',
   lang = 'fr',
   currentUser,
+  rolePreview = 'admin',
   users: initialUsers = [],
   roles: initialRoles = [],
   onRefreshWorkspace,
 }: {
-  auditLogs: any[];
-  dbEngine: string;
+  auditLogs?: any[];
+  dbEngine?: string;
   lang?: Lang;
   currentUser?: any;
+  rolePreview?: 'admin' | 'secretary' | 'avi';
   users?: any[];
   roles?: any[];
   onRefreshWorkspace?: () => void;
 }) {
   const isEn = lang === 'en';
-  const isAdmin = currentUser?.business_profile === 'Admin' || currentUser?.role === 'admin';
+  const isAdmin =
+    rolePreview === 'admin' ||
+    currentUser?.business_profile === 'Admin' ||
+    currentUser?.role === 'admin';
 
   const [subTab, setSubTab] = useState<'matrix' | 'roles' | 'users' | 'audit'>('users');
   const [userList, setUserList] = useState<any[]>(initialUsers);
@@ -2137,8 +2142,15 @@ export function ParametresGovernanceScreen({
 
   const fetchUsersAndRoles = useCallback(async () => {
     try {
+      const activeEmail =
+        rolePreview === 'secretary'
+          ? 'marc.kouassi@liec-education.com'
+          : rolePreview === 'avi'
+          ? 'alain.kanza@liec-education.com'
+          : currentUser?.email || 'sarah.mwamba@liec-education.com';
+
       const res = await fetch('/api/users', {
-        headers: { 'x-user-email': currentUser?.email || 'sarah.mwamba@liec-education.com' },
+        headers: { 'x-user-email': activeEmail },
       });
       if (res.ok) {
         const data = await res.json();
@@ -2148,18 +2160,19 @@ export function ParametresGovernanceScreen({
     } catch (e) {
       console.warn('Failed to fetch users:', e);
     }
-  }, [currentUser]);
+  }, [currentUser, rolePreview]);
 
   useEffect(() => {
     if (initialUsers && initialUsers.length > 0) {
       setUserList(initialUsers);
-    } else {
-      fetchUsersAndRoles();
     }
+  }, [initialUsers]);
+
+  useEffect(() => {
     if (initialRoles && initialRoles.length > 0) {
       setRoleList(initialRoles);
     }
-  }, [initialUsers, initialRoles, fetchUsersAndRoles]);
+  }, [initialRoles]);
 
   const showFeedback = (msg: string) => {
     setFeedbackMsg(msg);

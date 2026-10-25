@@ -134,6 +134,32 @@ export default function LiecWorkspacePage() {
     }, 4500);
   }, []);
 
+  const isNavVisible = useCallback(
+    (tab: NavTab, targetRole?: 'admin' | 'secretary' | 'avi') => {
+      const role = targetRole || rolePreview;
+      if (role === 'admin') return true;
+      if (role === 'secretary') {
+        return [
+          'overview',
+          'demandes',
+          'prospects',
+          'candidats',
+          'prepa',
+          'contenus',
+          'notifications',
+          'aide',
+        ].includes(tab);
+      }
+      if (role === 'avi') {
+        return ['overview', 'services', 'rapports', 'notifications', 'parametres', 'aide'].includes(
+          tab
+        );
+      }
+      return true;
+    },
+    [rolePreview]
+  );
+
   const fetchWorkspace = useCallback(async (overrideEmail?: string) => {
     try {
       const activeEmail =
@@ -142,7 +168,7 @@ export default function LiecWorkspacePage() {
           ? 'marc.kouassi@liec-education.com'
           : rolePreview === 'avi'
           ? 'alain.kanza@liec-education.com'
-          : currentUser?.email || 'sarah.mwamba@liec-education.com');
+          : 'sarah.mwamba@liec-education.com');
 
       const res = await fetch(`/api/workspace?user_email=${encodeURIComponent(activeEmail)}`, {
         cache: 'no-store',
@@ -172,12 +198,11 @@ export default function LiecWorkspacePage() {
     } finally {
       setLoading(false);
     }
-  }, [currentUser, rolePreview, isEn, showToast]);
+  }, [rolePreview, isEn, showToast]);
 
+  // Initial load ONCE on mount
   useEffect(() => {
-    fetchWorkspace();
-
-    // Load authenticated user & role
+    let initialEmail = 'sarah.mwamba@liec-education.com';
     const savedUserStr = localStorage.getItem('liec_user');
     if (savedUserStr) {
       try {
@@ -192,10 +217,12 @@ export default function LiecWorkspacePage() {
             setActiveTab('overview');
           }
         }
-      } catch (e) {}
+        if (u.email) initialEmail = u.email;
+      } catch (e) {
+        console.warn('Could not parse user:', e);
+      }
     }
 
-    // Load saved language preference (French by default if not set)
     const savedLang = localStorage.getItem('liec_lang') as Lang | null;
     if (savedLang === 'fr' || savedLang === 'en') {
       setLang(savedLang);
@@ -204,24 +231,46 @@ export default function LiecWorkspacePage() {
       localStorage.setItem('liec_lang', 'fr');
     }
 
-    // Load theme
     const savedTheme = localStorage.getItem('liec_theme');
     if (savedTheme === 'dark') {
       setDarkMode(true);
       document.documentElement.classList.add('dark');
     }
-  }, [fetchWorkspace]);
 
-  useEffect(() => {
-    // Automatically enforce tab restrictions for current role
-    if (!isNavVisible(activeTab)) {
-      if (rolePreview === 'avi') {
-        setActiveTab('services');
-      } else {
-        setActiveTab('overview');
-      }
+    fetchWorkspace(initialEmail);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleRoleChange = (nextRole: 'admin' | 'secretary' | 'avi') => {
+    setRolePreview(nextRole);
+    const simEmail =
+      nextRole === 'secretary'
+        ? 'marc.kouassi@liec-education.com'
+        : nextRole === 'avi'
+        ? 'alain.kanza@liec-education.com'
+        : 'sarah.mwamba@liec-education.com';
+    fetchWorkspace(simEmail);
+    if (!isNavVisible(activeTab, nextRole)) {
+      setActiveTab(nextRole === 'avi' ? 'services' : 'overview');
     }
-  }, [rolePreview, activeTab]);
+    showToast(
+      isEn
+        ? `Role switched to: ${
+            nextRole === 'admin'
+              ? 'Administrator / Senior Advisor'
+              : nextRole === 'secretary'
+              ? 'Secretary'
+              : 'AVI Officer'
+          }`
+        : `Aperçu du rôle changé : ${
+            nextRole === 'admin'
+              ? 'Administrateur / Conseillère Senior'
+              : nextRole === 'secretary'
+              ? 'Secrétaire'
+              : 'Officier AVI'
+          }`
+    );
+  };
 
   const toggleLanguage = (targetLang: Lang) => {
     setLang(targetLang);
@@ -515,28 +564,6 @@ export default function LiecWorkspacePage() {
     }
   };
 
-  // Role-based sidebar item visibility
-  const isNavVisible = (tab: NavTab) => {
-    if (rolePreview === 'admin') return true;
-    if (rolePreview === 'secretary') {
-      return [
-        'overview',
-        'demandes',
-        'prospects',
-        'candidats',
-        'prepa',
-        'contenus',
-        'notifications',
-        'aide',
-      ].includes(tab);
-    }
-    if (rolePreview === 'avi') {
-      return ['overview', 'services', 'rapports', 'notifications', 'parametres', 'aide'].includes(
-        tab
-      );
-    }
-    return true;
-  };
 
   const newDemandesBadgeCount = 14 + Math.max(0, demandes.length - 11);
 
@@ -839,39 +866,7 @@ export default function LiecWorkspacePage() {
                 </span>
                 <select
                   value={rolePreview}
-                  onChange={(e) => {
-                    const nextRole = e.target.value as 'admin' | 'secretary' | 'avi';
-                    setRolePreview(nextRole);
-                    const simEmail =
-                      nextRole === 'secretary'
-                        ? 'marc.kouassi@liec-education.com'
-                        : nextRole === 'avi'
-                        ? 'alain.kanza@liec-education.com'
-                        : 'sarah.mwamba@liec-education.com';
-                    fetchWorkspace(simEmail);
-                    if (nextRole === 'avi') {
-                      setActiveTab('services');
-                    } else {
-                      setActiveTab('overview');
-                    }
-                    showToast(
-                      isEn
-                        ? `Role switched to: ${
-                            nextRole === 'admin'
-                              ? 'Administrator / Senior Advisor'
-                              : nextRole === 'secretary'
-                              ? 'Secretary'
-                              : 'AVI Officer'
-                          }`
-                        : `Aperçu du rôle changé : ${
-                            nextRole === 'admin'
-                              ? 'Administrateur / Conseillère Senior'
-                              : nextRole === 'secretary'
-                              ? 'Secrétaire'
-                              : 'Officier AVI'
-                          }`
-                    );
-                  }}
+                  onChange={(e) => handleRoleChange(e.target.value as 'admin' | 'secretary' | 'avi')}
                   aria-label="Gestion de rôles"
                   className="rounded-lg border border-[#ccece2] bg-white px-2 py-1 text-xs font-extrabold text-[#092342] focus:outline-none cursor-pointer"
                 >
@@ -1053,6 +1048,7 @@ export default function LiecWorkspacePage() {
                   dbEngine={dbEngine}
                   lang={lang}
                   currentUser={currentUser}
+                  rolePreview={rolePreview}
                   users={users}
                   roles={roles}
                   onRefreshWorkspace={fetchWorkspace}
