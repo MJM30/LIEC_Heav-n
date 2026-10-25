@@ -23,6 +23,14 @@ import {
   DollarSign,
   TrendingUp,
   UserCheck,
+  UserPlus,
+  ShieldAlert,
+  Key,
+  Unlock,
+  SlidersHorizontal,
+  Eye,
+  X,
+  Check,
   Info,
 } from 'lucide-react';
 
@@ -2086,139 +2094,863 @@ export function RapportsFinanceScreen({
 }
 
 export function ParametresGovernanceScreen({
-  auditLogs,
+  auditLogs = [],
   dbEngine,
-  lang = 'en',
+  lang = 'fr',
+  currentUser,
+  users: initialUsers = [],
+  roles: initialRoles = [],
+  onRefreshWorkspace,
 }: {
   auditLogs: any[];
   dbEngine: string;
   lang?: Lang;
+  currentUser?: any;
+  users?: any[];
+  roles?: any[];
+  onRefreshWorkspace?: () => void;
 }) {
   const isEn = lang === 'en';
+  const isAdmin = currentUser?.business_profile === 'Admin' || currentUser?.role === 'admin';
+
+  const [subTab, setSubTab] = useState<'matrix' | 'roles' | 'users' | 'audit'>('users');
+  const [userList, setUserList] = useState<any[]>(initialUsers);
+  const [roleList, setRoleList] = useState<any[]>(initialRoles);
+  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [loadingAction, setLoadingAction] = useState(false);
+
+  // Create User Modal State
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserProfile, setNewUserProfile] = useState<'Admin' | 'Secretary' | 'Finance Officer'>('Secretary');
+  const [newUserRoles, setNewUserRoles] = useState<string[]>(['lh_internal', 'ITIL']);
+  const [newUserTitle, setNewUserTitle] = useState('');
+
+  // Edit Roles Modal State
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editProfile, setEditProfile] = useState<'Admin' | 'Secretary' | 'Finance Officer'>('Secretary');
+  const [editRoles, setEditRoles] = useState<string[]>([]);
+
+  // Search in user list
+  const [userSearch, setUserSearch] = useState('');
+
+  const fetchUsersAndRoles = useCallback(async () => {
+    try {
+      const res = await fetch('/api/users', {
+        headers: { 'x-user-email': currentUser?.email || 'sarah.mwamba@liec-education.com' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.users) setUserList(data.users);
+        if (data.roles) setRoleList(data.roles);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch users:', e);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (initialUsers && initialUsers.length > 0) {
+      setUserList(initialUsers);
+    } else {
+      fetchUsersAndRoles();
+    }
+    if (initialRoles && initialRoles.length > 0) {
+      setRoleList(initialRoles);
+    }
+  }, [initialUsers, initialRoles, fetchUsersAndRoles]);
+
+  const showFeedback = (msg: string) => {
+    setFeedbackMsg(msg);
+    setTimeout(() => setFeedbackMsg(null), 5000);
+  };
+
+  const handleToggleSuspend = async (targetUser: any) => {
+    setLoadingAction(true);
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-email': currentUser?.email || 'sarah.mwamba@liec-education.com',
+        },
+        body: JSON.stringify({
+          userId: targetUser.id,
+          action: 'toggle_status',
+          active: !targetUser.active,
+        }),
+      });
+      if (res.ok) {
+        await fetchUsersAndRoles();
+        onRefreshWorkspace?.();
+        showFeedback(
+          targetUser.active
+            ? isEn
+              ? `Account ${targetUser.name} suspended. Server access revoked.`
+              : `Compte de ${targetUser.name} suspendu. Accès serveur révoqué.`
+            : isEn
+            ? `Account ${targetUser.name} reactivated.`
+            : `Compte de ${targetUser.name} réactivé avec succès.`
+        );
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || 'Erreur lors de la modification du statut');
+      }
+    } catch {
+      showFeedback('Erreur réseau lors de la mise à jour du statut.');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleSaveCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserEmail.trim()) return;
+    setLoadingAction(true);
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-email': currentUser?.email || 'sarah.mwamba@liec-education.com',
+        },
+        body: JSON.stringify({
+          name: newUserName.trim(),
+          email: newUserEmail.trim(),
+          business_profile: newUserProfile,
+          technical_roles: newUserRoles,
+          title: newUserTitle.trim() || `Collaborateur ${newUserProfile}`,
+        }),
+      });
+      if (res.ok) {
+        setShowCreateModal(false);
+        setNewUserName('');
+        setNewUserEmail('');
+        setNewUserTitle('');
+        await fetchUsersAndRoles();
+        onRefreshWorkspace?.();
+        showFeedback(
+          isEn
+            ? `User account created and technical roles assigned.`
+            : `Utilisateur créé et rôles techniques assignés avec succès.`
+        );
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || 'Erreur création');
+      }
+    } catch {
+      showFeedback('Erreur lors de la création');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleOpenEditRoles = (u: any) => {
+    setEditingUser(u);
+    setEditProfile(u.business_profile || 'Secretary');
+    setEditRoles(Array.isArray(u.technical_roles) ? u.technical_roles : []);
+  };
+
+  const handleSaveEditRoles = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setLoadingAction(true);
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-email': currentUser?.email || 'sarah.mwamba@liec-education.com',
+        },
+        body: JSON.stringify({
+          userId: editingUser.id,
+          action: 'update_roles',
+          business_profile: editProfile,
+          technical_roles: editRoles,
+        }),
+      });
+      if (res.ok) {
+        setEditingUser(null);
+        await fetchUsersAndRoles();
+        onRefreshWorkspace?.();
+        showFeedback(
+          isEn
+            ? `Roles and business profile updated for ${editingUser.name}.`
+            : `Rôles et profil métier mis à jour pour ${editingUser.name}.`
+        );
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || 'Erreur mise à jour');
+      }
+    } catch {
+      showFeedback('Erreur réseau');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  // Filtered users for search
+  const filteredUsers = userList.filter((u) => {
+    const q = userSearch.toLowerCase();
+    return (
+      u.name?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q) ||
+      u.business_profile?.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-6">
-      <div>
-        <span className="inline-block rounded-full bg-[#e6effa] px-3 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wider text-[#092342] mb-2">
-          {isEn
-            ? 'GOVERNANCE, RBAC & POSTGRESQL ARCHITECTURE'
-            : 'GOUVERNANCE, RBAC & ARCHITECTURE POSTGRESQL'}
-        </span>
-        <h1 className="text-[28px] font-extrabold text-[#092342] leading-tight">
-          {isEn
-            ? 'Settings, Role Permission Matrix & Audit Trail'
-            : "Paramètres, Matrice des Rôles & Journal d'Audit"}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {isEn
-            ? 'Role-based access control (least privilege) and server-side audit logging. Active engine: '
-            : "Contrôle d'accès basé sur les rôles et journalisation serveur. Moteur actif : "}
-          <strong className="text-[#0c685a] uppercase">{dbEngine} (PostgreSQL)</strong>.
-        </p>
-      </div>
-
-      {/* Role Permission Matrix */}
-      <div className="rounded-2xl border border-[#e6eef6] bg-white p-6 shadow-card space-y-4">
-        <h2 className="text-base font-extrabold text-[#092342]">
-          {isEn ? 'Role-Based Permission Matrix (RBAC)' : 'Matrice des Permissions par Rôle (RBAC)'}
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-y border-slate-100 bg-[#f8fafc] text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                <th className="py-3 px-4">
-                  {isEn ? 'OPERATIONAL CAPABILITY' : 'CAPACITÉ OPÉRATIONNELLE'}
-                </th>
-                <th className="py-3 px-4">{isEn ? 'SECRETARY' : 'SECRÉTAIRE'}</th>
-                <th className="py-3 px-4">{isEn ? 'AVI OFFICER' : 'OFFICIER AVI'}</th>
-                <th className="py-3 px-4">
-                  {isEn ? 'ADMIN / SENIOR ADVISOR' : 'ADMINISTRATEUR / CONSEILLÈRE SENIOR'}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {[
-                {
-                  cap: isEn
-                    ? 'Qualification of public web portal applications'
-                    : 'Qualification des demandes du portail web public',
-                  sec: isEn ? 'Allowed' : 'Autorisé',
-                  avi: isEn ? 'Assigned Only' : 'Limité / Assigné',
-                  adm: isEn ? 'Allowed' : 'Autorisé',
-                },
-                {
-                  cap: isEn
-                    ? 'Parent / Student AVI dossier registration & Passport OP/PO check'
-                    : 'Création dossier parent/étudiant AVI & vérification Passeport OP/PO',
-                  sec: isEn ? 'Allowed' : 'Autorisé',
-                  avi: isEn ? 'Allowed' : 'Autorisé',
-                  adm: isEn ? 'Allowed' : 'Autorisé',
-                },
-                {
-                  cap: isEn
-                    ? 'YIMMILINE 3-offer simulation, Live FX & €150 LIEC interest cut'
-                    : 'Simulation 3 offres YIMMILINE, Taux temps réel & part LIEC 150 €',
-                  sec: isEn ? 'Read-only' : 'Lecture seule',
-                  avi: isEn ? 'Allowed' : 'Autorisé',
-                  adm: isEn ? 'Allowed' : 'Autorisé',
-                },
-                {
-                  cap: isEn
-                    ? 'Submission of AVI financing dossier to YIMMILINE partner'
-                    : 'Transmission du dossier AVI au partenaire YIMMILINE',
-                  sec: isEn ? 'Restricted' : 'Non par défaut',
-                  avi: isEn ? 'Allowed' : 'Autorisé',
-                  adm: isEn ? 'Allowed' : 'Autorisé',
-                },
-              ].map((row) => (
-                <tr key={row.cap}>
-                  <td className="py-3 px-4 font-bold text-[#092342]">{row.cap}</td>
-                  <td className="py-3 px-4">
-                    <span className="rounded-full bg-slate-100 text-slate-700 px-2.5 py-0.5 text-[10.5px] font-extrabold">
-                      {row.sec}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className="rounded-full bg-[#ccf5e5] text-[#0c685a] px-2.5 py-0.5 text-[10.5px] font-extrabold">
-                      {row.avi}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className="rounded-full bg-[#ccf5e5] px-2.5 py-0.5 text-[10.5px] font-extrabold text-[#0c685a]">
-                      {row.adm}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Header & Platform Status */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <span className="inline-block rounded-full bg-[#d8f6ea] px-3 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wider text-[#0c685a] mb-2">
+            {isEn
+              ? 'SERVICENOW-INSPIRED RBAC & SECURITY ARCHITECTURE'
+              : 'ARCHITECTURE RBAC & SÉCURITÉ SERVICENOW'}
+          </span>
+          <h1 className="text-[26px] font-extrabold text-[#092342] leading-tight">
+            {isEn
+              ? 'Role-Based Access Control (RBAC) & User Management'
+              : 'Contrôle d’Accès par Rôles (RBAC) & Gestion des Utilisateurs'}
+          </h1>
+          <p className="mt-1 text-xs text-slate-500 max-w-2xl">
+            {isEn
+              ? 'Server-side enforcement of business roles, technical roles, field-level ACLs and audit logging.'
+              : 'Application stricte côté serveur des rôles métiers, rôles techniques, ACL au niveau champ et journal d’audit.'}
+          </p>
         </div>
-      </div>
 
-      {/* Audit Trail */}
-      <div className="rounded-2xl border border-[#e6eef6] bg-white p-6 shadow-card space-y-4">
-        <h2 className="text-base font-extrabold text-[#092342]">
-          {isEn ? 'PostgreSQL Audit Trail (Real-Time)' : "Journal d'Audit PostgreSQL (Temps réel)"}
-        </h2>
-        <div className="space-y-2">
-          {auditLogs.map((log) => (
-            <div
-              key={log.id}
-              className="rounded-xl bg-[#f4f8fc] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs"
-            >
-              <div className="flex items-center gap-3">
-                <span className="rounded-md bg-[#092342] text-white px-2 py-0.5 text-[10px] font-extrabold">
-                  {log.entity_ref}
-                </span>
-                <span className="font-extrabold text-[#092342]">{log.actor}</span>
-                <span className="text-slate-600">{log.action}</span>
-              </div>
-              <span className="rounded-full bg-[#ccf5e5] px-2.5 py-0.5 text-[10px] font-extrabold text-[#0c685a]">
-                {log.outcome}
+        {/* Current User RBAC Identity Card */}
+        <div className="rounded-2xl border border-[#d8f6ea] bg-[#f0faf7] p-3 flex items-center gap-3 shrink-0">
+          <div className="h-10 w-10 rounded-full bg-[#0c685a] text-white flex items-center justify-center font-extrabold text-sm shadow-xs">
+            {currentUser?.initials || 'SM'}
+          </div>
+          <div>
+            <div className="text-xs font-extrabold text-[#092342] flex items-center gap-1.5">
+              <span>{currentUser?.name || 'Sarah Mwamba'}</span>
+              <span className="rounded-full bg-[#0c685a] text-white px-2 py-0.2 text-[9.5px] font-extrabold">
+                {currentUser?.business_profile || 'Admin'}
               </span>
             </div>
-          ))}
+            <div className="text-[10px] text-slate-600 mt-0.5 flex items-center gap-1">
+              <Key className="w-3 h-3 text-[#0c685a]" />
+              <span>
+                {Array.isArray(currentUser?.technical_roles)
+                  ? currentUser.technical_roles.join(', ')
+                  : 'admin, lh_security_admin'}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
+
+      {feedbackMsg && (
+        <div className="rounded-xl border border-[#bbf0df] bg-[#eefaf6] p-3 text-xs font-extrabold text-[#0c685a] flex items-center justify-between animate-fadeIn">
+          <span>{feedbackMsg}</span>
+          <button onClick={() => setFeedbackMsg(null)} className="text-slate-400 hover:text-slate-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Sub-Navigation Tabs */}
+      <div className="flex border-b border-slate-200 gap-2 overflow-x-auto text-xs font-extrabold">
+        {[
+          { id: 'users', label: isEn ? 'User Management (Workflow)' : 'Gestion des Utilisateurs', icon: Users },
+          { id: 'roles', label: isEn ? 'Technical Roles Table' : 'Table des Rôles Techniques', icon: Key },
+          { id: 'matrix', label: isEn ? 'Access Matrix' : 'Matrice d’Accès (Matrix)', icon: SlidersHorizontal },
+          { id: 'audit', label: isEn ? 'Audit & Security Trail' : 'Journal d’Audit & Sécurité', icon: ShieldCheck },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const active = subTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setSubTab(tab.id as any)}
+              className={`flex items-center gap-2 py-3 px-4 border-b-2 transition whitespace-nowrap ${
+                active
+                  ? 'border-[#0c685a] text-[#0c685a] bg-[#f0faf7]'
+                  : 'border-transparent text-slate-500 hover:text-[#092342] hover:bg-slate-50'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* TAB 1: USER MANAGEMENT WORKFLOW (Admin Only) */}
+      {subTab === 'users' && (
+        <div className="space-y-4">
+          {!isAdmin ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900 text-xs">
+              <div className="flex items-center gap-2 text-sm font-extrabold mb-1">
+                <ShieldAlert className="w-5 h-5 text-amber-700" />
+                <span>Accès Restreint aux Administrateurs</span>
+              </div>
+              <p>
+                Seul un utilisateur doté du profil <strong>Admin</strong> ou des rôles techniques{' '}
+                <code>admin</code> / <code>lh_security_admin</code> est autorisé à gérer les utilisateurs,
+                assigner des rôles ou suspendre des comptes.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Action Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#e6eef6]">
+                <div className="relative flex-1 max-w-sm">
+                  <input
+                    type="text"
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    placeholder={isEn ? 'Filter users by name, email, profile...' : 'Filtrer par nom, email, profil...'}
+                    className="w-full rounded-xl bg-[#f6f9fc] border border-slate-200 px-3 py-2 text-xs text-[#092342] focus:outline-none focus:ring-2 focus:ring-[#0c685a]/25"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setNewUserProfile('Secretary');
+                      setNewUserRoles(['lh_internal', 'ITIL']);
+                      setShowCreateModal(true);
+                    }}
+                    className="rounded-xl bg-[#0c685a] hover:bg-[#094e45] text-white px-4 py-2.5 text-xs font-extrabold flex items-center gap-2 shadow-xs transition"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>{isEn ? '+ Create User' : '+ Créer un Utilisateur'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Users Table */}
+              <div className="rounded-2xl border border-[#e6eef6] bg-white overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-[#f8fafc] text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                        <th className="py-3 px-4">Utilisateur / Compte</th>
+                        <th className="py-3 px-4">Profil Métier</th>
+                        <th className="py-3 px-4">Rôles Techniques Assignés</th>
+                        <th className="py-3 px-4">Statut</th>
+                        <th className="py-3 px-4 text-right">Actions Admin</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredUsers.map((u) => {
+                        const roles: string[] = Array.isArray(u.technical_roles) ? u.technical_roles : [];
+                        return (
+                          <tr key={u.id} className="hover:bg-slate-50 transition">
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-full bg-[#092342] text-white flex items-center justify-center font-extrabold text-xs">
+                                  {u.initials || u.name?.slice(0, 2).toUpperCase()}
+                                </div>
+                                <div>
+                                  <div className="font-extrabold text-[#092342]">{u.name}</div>
+                                  <div className="text-[11px] text-slate-500">{u.email}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-extrabold ${
+                                  u.business_profile === 'Admin'
+                                    ? 'bg-[#e0f8ef] text-[#0c685a]'
+                                    : u.business_profile === 'Finance Officer'
+                                    ? 'bg-[#fef3c7] text-[#92400e]'
+                                    : 'bg-[#e0f2fe] text-[#0369a1]'
+                                }`}
+                              >
+                                {u.business_profile || 'Secretary'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="flex flex-wrap gap-1">
+                                {roles.length > 0 ? (
+                                  roles.map((r) => (
+                                    <span
+                                      key={r}
+                                      className="rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-700"
+                                    >
+                                      {r}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-[10px] text-slate-400 italic">Aucun rôle</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              {u.active ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[#dcfce7] text-[#15803d] px-2.5 py-0.5 text-[10.5px] font-extrabold">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Actif</span>
+                                </span>
+                              ) : (
+                                <div>
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2.5 py-0.5 text-[10.5px] font-extrabold">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    <span>Suspendu</span>
+                                  </span>
+                                  {u.suspended_by && (
+                                    <div className="text-[9.5px] text-red-500 mt-0.5">Par {u.suspended_by}</div>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  onClick={() => handleOpenEditRoles(u)}
+                                  className="rounded-lg border border-slate-200 hover:border-[#0c685a] bg-white px-2.5 py-1 text-[11px] font-extrabold text-[#092342] hover:text-[#0c685a] transition"
+                                >
+                                  Modifier rôles
+                                </button>
+                                <button
+                                  onClick={() => handleToggleSuspend(u)}
+                                  disabled={loadingAction || u.email === currentUser?.email}
+                                  title={
+                                    u.email === currentUser?.email
+                                      ? 'Impossible de suspendre votre propre compte connecté'
+                                      : u.active
+                                      ? 'Suspendre immédiatement le compte'
+                                      : 'Réactiver le compte'
+                                  }
+                                  className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition ${
+                                    u.email === currentUser?.email
+                                      ? 'opacity-40 cursor-not-allowed bg-slate-100 text-slate-400'
+                                      : u.active
+                                      ? 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                                      : 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                  }`}
+                                >
+                                  {u.active ? 'Suspendre' : 'Réactiver'}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: TECHNICAL ROLES TABLE (Section 2 of PDF) */}
+      {subTab === 'roles' && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-[#e6eef6] bg-white p-6 shadow-xs space-y-4">
+            <div>
+              <h2 className="text-base font-extrabold text-[#092342]">
+                {isEn ? 'Technical Roles Table (Section 2)' : 'Table des Rôles Techniques Officielle (Section 2)'}
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                {isEn
+                  ? 'Technical roles assignable to platform users, their intended business profile mapping and security safeguards.'
+                  : 'Rôles techniques attribuables, correspondance avec les profils métiers et garde-fous de sécurité.'}
+              </p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-[#f8fafc] text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                    <th className="py-3 px-4">Rôle Technique</th>
+                    <th className="py-3 px-4">Profil Métier Associé</th>
+                    <th className="py-3 px-4">Description Opérationnelle</th>
+                    <th className="py-3 px-4">Garde-fous / Safeguards</th>
+                    <th className="py-3 px-4">Statut</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {[
+                    {
+                      role_id: 'admin',
+                      mapping: 'Admin',
+                      desc: 'Highest privilege. Platform administration and full system oversight.',
+                      safeguards: 'Assign only to trusted administrators; log assignments and removals.',
+                    },
+                    {
+                      role_id: 'lh_security_admin',
+                      mapping: 'Admin',
+                      desc: 'Security administration. Limit access to security configuration and sensitive controls.',
+                      safeguards: 'Limit access to security configuration and sensitive controls.',
+                    },
+                    {
+                      role_id: 'ITIL',
+                      mapping: 'Secretary',
+                      desc: 'Secretary workflows (as configured). Applicant intake and status transitions.',
+                      safeguards: 'Do not assume this role means full administrator access. Verify permissions.',
+                    },
+                    {
+                      role_id: 'lh_internal',
+                      mapping: 'Secretary',
+                      desc: 'Internal application access. Restrict to applicant intake, assigned records, comments and history.',
+                      safeguards: 'Restrict to applicant intake, assigned records, comments and history.',
+                    },
+                    {
+                      role_id: 'lh_finance',
+                      mapping: 'Finance Officer (Blocked Finance / AVI)',
+                      desc: 'AVI and parent-financing operations. YIMMILINE desk calculations and loan requests.',
+                      safeguards: 'Restrict to AVI-related functions and records; do not grant unrelated finance or system configuration access.',
+                    },
+                  ].map((r) => (
+                    <tr key={r.role_id} className="hover:bg-slate-50">
+                      <td className="py-3 px-4 font-mono font-extrabold text-[#0c685a]">
+                        <span className="bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
+                          {r.role_id}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-extrabold text-[#092342]">{r.mapping}</td>
+                      <td className="py-3 px-4 text-slate-600">{r.desc}</td>
+                      <td className="py-3 px-4 text-slate-500 italic text-[11px]">{r.safeguards}</td>
+                      <td className="py-3 px-4">
+                        <span className="rounded-full bg-[#dcfce7] text-[#15803d] px-2 py-0.5 text-[10px] font-extrabold">
+                          Actif
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: ACCESS MATRIX (Section 3 of PDF) */}
+      {subTab === 'matrix' && (
+        <div className="rounded-2xl border border-[#e6eef6] bg-white p-6 shadow-xs space-y-4">
+          <div>
+            <h2 className="text-base font-extrabold text-[#092342]">
+              {isEn ? 'RBAC Access Matrix (Section 3)' : 'Matrice d’Accès Officielle (Section 3)'}
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Règles d’autorisation strictes par module et action pour les 3 profils métiers.
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 bg-[#f8fafc] text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                  <th className="py-3 px-4">Module / Action</th>
+                  <th className="py-3 px-4">Admin</th>
+                  <th className="py-3 px-4">Finance Officer</th>
+                  <th className="py-3 px-4">Secretary</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {[
+                  { module: 'Dashboard', admin: 'All modules', finance: 'Finance / AVI view', sec: 'Intake / tasks view' },
+                  { module: 'Website and in-office applications', admin: 'Full', finance: 'Only if needed for AVI', sec: 'Review and follow up' },
+                  { module: 'Student records', admin: 'All authorized records', finance: 'Relevant financial/AVI fields', sec: 'Administrative fields' },
+                  { module: 'General finance', admin: 'Full', finance: 'Authorized finance operations', sec: 'Denied by default' },
+                  { module: 'Blocked Finance (AVI)', admin: 'Oversight', finance: 'Manage assigned AVI cases', sec: 'Denied by default' },
+                  { module: 'YIMMILINE submission', admin: 'Oversight / authorized action', finance: 'Submit assigned cases', sec: 'Denied' },
+                  { module: 'Admissions / Campus France', admin: 'Full oversight', finance: 'Relevant payment status only', sec: 'Administrative tracking' },
+                  { module: 'Comments, work notes, history', admin: 'All authorized records', finance: 'AVI records only', sec: 'Application records only' },
+                  { module: 'Users, roles and system configuration', admin: 'Manage', finance: 'Denied', sec: 'Denied' },
+                  { module: 'Reports and exports', admin: 'All authorized reports', finance: 'Finance / AVI reports', sec: 'Intake reports' },
+                ].map((row) => (
+                  <tr key={row.module} className="hover:bg-slate-50">
+                    <td className="py-3 px-4 font-bold text-[#092342]">{row.module}</td>
+                    <td className="py-3 px-4">
+                      <span className="rounded-full bg-[#dcfce7] text-[#15803d] px-2.5 py-0.5 text-[10.5px] font-extrabold">
+                        {row.admin}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-extrabold ${
+                          row.finance.includes('Denied')
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-[#fef3c7] text-[#92400e]'
+                        }`}
+                      >
+                        {row.finance}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-extrabold ${
+                          row.sec.includes('Denied')
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-[#e0f2fe] text-[#0369a1]'
+                        }`}
+                      >
+                        {row.sec}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: AUDIT TRAIL */}
+      {subTab === 'audit' && (
+        <div className="rounded-2xl border border-[#e6eef6] bg-white p-6 shadow-xs space-y-4">
+          <div>
+            <h2 className="text-base font-extrabold text-[#092342]">
+              {isEn ? 'Security Audit Trail & Server-Side Enforcement Logs' : 'Journal d’Audit de Sécurité & Contrôles Serveur'}
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Traces des modifications de rôles, suspensions de comptes et rejets d'accès 403 Forbidden.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {auditLogs.length > 0 ? (
+              auditLogs.map((log) => {
+                const isViolation = log.outcome?.includes('DENIED') || log.action?.includes('SECURITY_VIOLATION');
+                return (
+                  <div
+                    key={log.id}
+                    className={`rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs border ${
+                      isViolation
+                        ? 'bg-red-50 border-red-200 text-red-900'
+                        : 'bg-[#f8fafc] border-slate-100 text-[#092342]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`rounded-md px-2 py-0.5 text-[10px] font-extrabold text-white ${
+                          isViolation ? 'bg-red-600' : 'bg-[#092342]'
+                        }`}
+                      >
+                        {log.entity_ref || 'AUTH'}
+                      </span>
+                      <span className="font-extrabold">{log.actor}</span>
+                      <span className="text-slate-600">{log.action}</span>
+                      {log.details && (
+                        <span className="text-[11px] text-slate-500 italic truncate max-w-md">
+                          ({log.details})
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                        isViolation
+                          ? 'bg-red-200 text-red-800'
+                          : 'bg-[#ccf5e5] text-[#0c685a]'
+                      }`}
+                    >
+                      {log.outcome || 'SUCCESS'}
+                    </span>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-xs text-slate-400 py-6 text-center">Aucun événement d’audit enregistré.</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CREATE USER */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4 animate-scaleUp">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-sm font-extrabold text-[#092342] flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-[#0c685a]" />
+                <span>Créer un Nouvel Utilisateur (Admin Workflow)</span>
+              </h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCreateUser} className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Nom complet</label>
+                <input
+                  type="text"
+                  required
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  placeholder="ex: Jean-Paul Mbuyi"
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0c685a]/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Email professionnel</label>
+                <input
+                  type="email"
+                  required
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  placeholder="ex: j.mbuyi@liec-education.com"
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0c685a]/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Profil Métier (Business Profile)</label>
+                <select
+                  value={newUserProfile}
+                  onChange={(e) => {
+                    const prof = e.target.value as any;
+                    setNewUserProfile(prof);
+                    if (prof === 'Admin') setNewUserRoles(['admin', 'lh_security_admin']);
+                    else if (prof === 'Finance Officer') setNewUserRoles(['lh_finance']);
+                    else setNewUserRoles(['lh_internal', 'ITIL']);
+                  }}
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0c685a]/20 font-extrabold text-[#092342]"
+                >
+                  <option value="Secretary">Secretary (Intake & Admissions)</option>
+                  <option value="Finance Officer">Finance Officer (Blocked Finance / AVI)</option>
+                  <option value="Admin">Admin (Full System Privilege)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Rôles Techniques à Assigner</label>
+                <div className="grid grid-cols-2 gap-2 border border-slate-200 rounded-xl p-2.5 bg-slate-50">
+                  {['admin', 'lh_security_admin', 'ITIL', 'lh_internal', 'lh_finance'].map((rId) => {
+                    const checked = newUserRoles.includes(rId);
+                    return (
+                      <label key={rId} className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) setNewUserRoles([...newUserRoles, rId]);
+                            else setNewUserRoles(newUserRoles.filter((r) => r !== rId));
+                          }}
+                          className="h-3.5 w-3.5 text-[#0c685a] rounded"
+                        />
+                        <span className="font-mono text-[11px]">{rId}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Intitulé de poste / Titre</label>
+                <input
+                  type="text"
+                  value={newUserTitle}
+                  onChange={(e) => setNewUserTitle(e.target.value)}
+                  placeholder="ex: Conseiller d'orientation Lyon"
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0c685a]/20"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-extrabold"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={loadingAction}
+                  className="px-4 py-2 rounded-xl bg-[#0c685a] hover:bg-[#094e45] text-white font-extrabold"
+                >
+                  Enregistrer l'utilisateur
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT ROLES */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4 animate-scaleUp">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-sm font-extrabold text-[#092342] flex items-center gap-2">
+                <Key className="w-4 h-4 text-[#0c685a]" />
+                <span>Modifier les Rôles de : {editingUser.name}</span>
+              </h3>
+              <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditRoles} className="space-y-4 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Profil Métier (Business Profile)</label>
+                <select
+                  value={editProfile}
+                  onChange={(e) => setEditProfile(e.target.value as any)}
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-extrabold text-[#092342]"
+                >
+                  <option value="Secretary">Secretary</option>
+                  <option value="Finance Officer">Finance Officer (Blocked Finance / AVI)</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Rôles Techniques Assignés</label>
+                <div className="space-y-2 border border-slate-200 rounded-xl p-3 bg-slate-50">
+                  {[
+                    { id: 'admin', warn: 'Attention: Accès privilège total sur la plateforme.' },
+                    { id: 'lh_security_admin', warn: 'Administration sécurité & contrôles sensibles.' },
+                    { id: 'ITIL', warn: 'Opérateur workflows Secrétariat.' },
+                    { id: 'lh_internal', warn: 'Accès interne aux dossiers et demandes d’admission.' },
+                    { id: 'lh_finance', warn: 'Gestion Guichet AVI et financements YIMMILINE.' },
+                  ].map((r) => {
+                    const checked = editRoles.includes(r.id);
+                    return (
+                      <div key={r.id} className="flex items-start gap-2.5 p-1.5 rounded-lg hover:bg-white">
+                        <input
+                          type="checkbox"
+                          id={`edit-role-${r.id}`}
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) setEditRoles([...editRoles, r.id]);
+                            else setEditRoles(editRoles.filter((id) => id !== r.id));
+                          }}
+                          className="mt-0.5 h-4 w-4 text-[#0c685a] rounded"
+                        />
+                        <label htmlFor={`edit-role-${r.id}`} className="cursor-pointer">
+                          <div className="font-mono font-extrabold text-[#092342]">{r.id}</div>
+                          <div className="text-[10px] text-slate-500">{r.warn}</div>
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-extrabold"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={loadingAction}
+                  className="px-4 py-2 rounded-xl bg-[#0c685a] hover:bg-[#094e45] text-white font-extrabold"
+                >
+                  Sauvegarder les modifications
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -106,6 +106,8 @@ export default function LiecWorkspacePage() {
   const [prepaCohorts, setPrepaCohorts] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
 
   const [selectedDemandeRef, setSelectedDemandeRef] = useState('#DEM-2025-089');
   const [selectedCandidatRef, setSelectedCandidatRef] = useState('#CAN-2025-042');
@@ -132,10 +134,26 @@ export default function LiecWorkspacePage() {
     }, 4500);
   }, []);
 
-  const fetchWorkspace = useCallback(async () => {
+  const fetchWorkspace = useCallback(async (overrideEmail?: string) => {
     try {
-      const res = await fetch('/api/workspace', { cache: 'no-store' });
-      if (!res.ok) return;
+      const activeEmail =
+        overrideEmail ||
+        (rolePreview === 'secretary'
+          ? 'marc.kouassi@liec-education.com'
+          : rolePreview === 'avi'
+          ? 'alain.kanza@liec-education.com'
+          : currentUser?.email || 'sarah.mwamba@liec-education.com');
+
+      const res = await fetch(`/api/workspace?user_email=${encodeURIComponent(activeEmail)}`, {
+        cache: 'no-store',
+        headers: { 'x-user-email': activeEmail },
+      });
+      if (!res.ok) {
+        if (res.status === 403) {
+          showToast(isEn ? 'Access restricted by server-side RBAC policy.' : 'Accès restreint par la politique RBAC du serveur.');
+        }
+        return;
+      }
       const data = await res.json();
       setDbEngine(data.engine || 'postgresql');
       setDemandes(data.demandes || []);
@@ -147,12 +165,14 @@ export default function LiecWorkspacePage() {
       setPrepaCohorts(data.prepaCohorts || []);
       setInvoices(data.invoices || []);
       setAuditLogs(data.auditLogs || []);
+      if (data.users) setUsers(data.users);
+      if (data.roles) setRoles(data.roles);
     } catch (err) {
       console.error('Failed to fetch workspace:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUser, rolePreview, isEn, showToast]);
 
   useEffect(() => {
     fetchWorkspace();
@@ -466,9 +486,19 @@ export default function LiecWorkspacePage() {
   };
 
   const handleCreateAvi = async (data: any) => {
+    const activeEmail =
+      rolePreview === 'secretary'
+        ? 'marc.kouassi@liec-education.com'
+        : rolePreview === 'avi'
+        ? 'alain.kanza@liec-education.com'
+        : currentUser?.email || 'sarah.mwamba@liec-education.com';
+
     const res = await fetch('/api/avi', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-email': activeEmail,
+      },
       body: JSON.stringify(data),
     });
     if (res.ok) {
@@ -476,12 +506,12 @@ export default function LiecWorkspacePage() {
       await fetchWorkspace();
       showToast(
         isEn
-          ? `Parent AVI Prefinancing application ${json.ref} successfully registered in PostgreSQL (LIEC Interest €150 recovered).`
-          : `Demande de préfinancement ${json.ref} enregistrée dans PostgreSQL (150 € d'intérêt récupérés par LIEC).`
+          ? `Parent AVI application ${json.ref} successfully registered.`
+          : `Demande AVI ${json.ref} enregistrée avec succès (150 € d'intérêt récupérés).`
       );
     } else {
       const err = await res.json();
-      showToast(err.error || 'Error submitting AVI application.');
+      showToast(err.message || err.error || 'Erreur soumission AVI (403)');
     }
   };
 
@@ -812,6 +842,13 @@ export default function LiecWorkspacePage() {
                   onChange={(e) => {
                     const nextRole = e.target.value as 'admin' | 'secretary' | 'avi';
                     setRolePreview(nextRole);
+                    const simEmail =
+                      nextRole === 'secretary'
+                        ? 'marc.kouassi@liec-education.com'
+                        : nextRole === 'avi'
+                        ? 'alain.kanza@liec-education.com'
+                        : 'sarah.mwamba@liec-education.com';
+                    fetchWorkspace(simEmail);
                     if (nextRole === 'avi') {
                       setActiveTab('services');
                     } else {
@@ -1015,6 +1052,10 @@ export default function LiecWorkspacePage() {
                   auditLogs={auditLogs}
                   dbEngine={dbEngine}
                   lang={lang}
+                  currentUser={currentUser}
+                  users={users}
+                  roles={roles}
+                  onRefreshWorkspace={fetchWorkspace}
                 />
               )}
 

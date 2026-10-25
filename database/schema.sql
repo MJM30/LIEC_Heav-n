@@ -2,15 +2,41 @@
 -- LIEC Education (LIEC One) - PostgreSQL Database Schema & Initial Seed Data
 -- ============================================================================
 
+-- 1. ROLES TABLE (Technical Roles & Business Profile Mappings)
+CREATE TABLE IF NOT EXISTS roles (
+  id SERIAL PRIMARY KEY,
+  role_id VARCHAR(50) UNIQUE NOT NULL,
+  role_name VARCHAR(100) NOT NULL,
+  business_profile VARCHAR(50) NOT NULL,
+  description TEXT NOT NULL,
+  safeguards TEXT NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  suspended_at TIMESTAMP WITH TIME ZONE,
+  suspended_by VARCHAR(120),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   name VARCHAR(120) NOT NULL,
   email VARCHAR(160) UNIQUE NOT NULL,
-  role VARCHAR(50) NOT NULL DEFAULT 'admin',
+  business_profile VARCHAR(50) NOT NULL DEFAULT 'Secretary',
+  role VARCHAR(50) NOT NULL DEFAULT 'secretary',
   title VARCHAR(100) NOT NULL DEFAULT 'Conseillère Senior',
   initials VARCHAR(10) NOT NULL DEFAULT 'SM',
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_roles (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role_id VARCHAR(50) NOT NULL REFERENCES roles(role_id) ON DELETE CASCADE,
+  assigned_by VARCHAR(120) NOT NULL DEFAULT 'System Admin',
+  assigned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, role_id)
 );
 
 CREATE TABLE IF NOT EXISTS demandes (
@@ -177,5 +203,44 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   action VARCHAR(160) NOT NULL,
   entity_ref VARCHAR(80) NOT NULL,
   outcome VARCHAR(50) NOT NULL DEFAULT 'Succès',
+  details TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Seed Technical Roles
+INSERT INTO roles (role_id, role_name, business_profile, description, safeguards, active) VALUES
+  ('admin', 'Platform Administrator', 'Admin', 'Highest privilege. Assign only to trusted administrators.', 'Assign only to trusted administrators; log assignments and removals.', TRUE),
+  ('lh_security_admin', 'Security Administrator', 'Admin', 'Security administration. Limit access to security configuration and sensitive controls.', 'Limit access to security configuration and sensitive controls.', TRUE),
+  ('ITIL', 'ITIL Workflow Operator', 'Secretary', 'Secretary workflows (as configured). Applicant intake and administrative tracking.', 'Do not assume this role means full administrator access. Verify permissions and inherited access.', TRUE),
+  ('lh_internal', 'Internal Application Access', 'Secretary', 'Internal application access. Restrict to applicant intake, assigned records, comments and history.', 'Restrict to applicant intake, assigned records, comments and history.', TRUE),
+  ('lh_finance', 'Finance & AVI Officer', 'Finance Officer', 'AVI and parent-financing operations, YIMMILINE desk calculations and loan requests.', 'Restrict to AVI-related functions and records; do not grant unrelated finance or system configuration access.', TRUE)
+ON CONFLICT (role_id) DO NOTHING;
+
+-- Seed Initial Users with Business Profiles
+INSERT INTO users (name, email, business_profile, role, title, initials, active) VALUES
+  ('Sarah Mwamba', 'sarah.mwamba@liec-education.com', 'Admin', 'admin', 'Senior Lyon Advisor & Platform Admin', 'SM', TRUE),
+  ('Marc Kouassi', 'marc.kouassi@liec-education.com', 'Secretary', 'secretary', 'DRC Admissions Secretary', 'MK', TRUE),
+  ('Alain Kanza', 'alain.kanza@liec-education.com', 'Finance Officer', 'avi', 'Head of AVI Desk', 'AK', TRUE),
+  ('Aïcha Diallo', 'aicha.diallo@liec-education.com', 'Secretary', 'secretary', 'Lyon Partner Schools Advisor', 'AD', TRUE)
+ON CONFLICT (email) DO NOTHING;
+
+-- Seed Technical Role Assignments
+INSERT INTO user_roles (user_id, role_id, assigned_by)
+SELECT u.id, 'admin', 'System Initializer' FROM users u WHERE LOWER(u.email) = 'sarah.mwamba@liec-education.com'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id, assigned_by)
+SELECT u.id, 'lh_security_admin', 'System Initializer' FROM users u WHERE LOWER(u.email) = 'sarah.mwamba@liec-education.com'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id, assigned_by)
+SELECT u.id, 'lh_internal', 'Sarah Mwamba (Admin)' FROM users u WHERE LOWER(u.email) = 'marc.kouassi@liec-education.com'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id, assigned_by)
+SELECT u.id, 'ITIL', 'Sarah Mwamba (Admin)' FROM users u WHERE LOWER(u.email) = 'marc.kouassi@liec-education.com'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id, assigned_by)
+SELECT u.id, 'lh_finance', 'Sarah Mwamba (Admin)' FROM users u WHERE LOWER(u.email) = 'alain.kanza@liec-education.com'
+ON CONFLICT (user_id, role_id) DO NOTHING;

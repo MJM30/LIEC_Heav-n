@@ -519,6 +519,71 @@ async function initSchemaAndSeed(client: DBClient) {
   const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
   await client.exec(schemaSql);
 
+  // Ensure RBAC schema columns and tables exist
+  await client.exec(`
+    CREATE TABLE IF NOT EXISTS roles (
+      id SERIAL PRIMARY KEY,
+      role_id VARCHAR(50) UNIQUE NOT NULL,
+      role_name VARCHAR(100) NOT NULL,
+      business_profile VARCHAR(50) NOT NULL,
+      description TEXT NOT NULL,
+      safeguards TEXT NOT NULL,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS user_roles (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role_id VARCHAR(50) NOT NULL REFERENCES roles(role_id) ON DELETE CASCADE,
+      assigned_by VARCHAR(120) NOT NULL DEFAULT 'System Admin',
+      assigned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, role_id)
+    );
+
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS business_profile VARCHAR(50) DEFAULT 'Secretary';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP WITH TIME ZONE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_by VARCHAR(120);
+    ALTER TABLE demande_notes ADD COLUMN IF NOT EXISTS timestamp_label VARCHAR(60) DEFAULT 'Today';
+
+    -- Seed Technical Roles from RBAC Specification if empty
+    INSERT INTO roles (role_id, role_name, business_profile, description, safeguards, active) VALUES
+      ('admin', 'Platform Administrator', 'Admin', 'Highest privilege. Assign only to trusted administrators.', 'Assign only to trusted administrators; log assignments and removals.', TRUE),
+      ('lh_security_admin', 'Security Administrator', 'Admin', 'Security administration. Limit access to security configuration and sensitive controls.', 'Limit access to security configuration and sensitive controls.', TRUE),
+      ('ITIL', 'ITIL Workflow Operator', 'Secretary', 'Secretary workflows (as configured). Applicant intake and administrative tracking.', 'Do not assume this role means full administrator access. Verify permissions and inherited access.', TRUE),
+      ('lh_internal', 'Internal Application Access', 'Secretary', 'Internal application access. Restrict to applicant intake, assigned records, comments and history.', 'Restrict to applicant intake, assigned records, comments and history.', TRUE),
+      ('lh_finance', 'Finance & AVI Officer', 'Finance Officer', 'AVI and parent-financing operations, YIMMILINE desk calculations and loan requests.', 'Restrict to AVI-related functions and records; do not grant unrelated finance or system configuration access.', TRUE)
+    ON CONFLICT (role_id) DO NOTHING;
+
+    -- Update existing users profiles
+    UPDATE users SET business_profile = 'Admin', role = 'admin', active = TRUE WHERE LOWER(email) = 'sarah.mwamba@liec-education.com';
+    UPDATE users SET business_profile = 'Secretary', role = 'secretary', active = TRUE WHERE LOWER(email) = 'marc.kouassi@liec-education.com';
+    UPDATE users SET business_profile = 'Finance Officer', role = 'avi', active = TRUE WHERE LOWER(email) = 'alain.kanza@liec-education.com';
+    UPDATE users SET business_profile = 'Secretary', role = 'secretary', active = TRUE WHERE LOWER(email) LIKE '%aicha%';
+
+    -- Assign Technical Roles
+    INSERT INTO user_roles (user_id, role_id, assigned_by)
+    SELECT u.id, 'admin', 'System Initializer' FROM users u WHERE LOWER(u.email) = 'sarah.mwamba@liec-education.com'
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+
+    INSERT INTO user_roles (user_id, role_id, assigned_by)
+    SELECT u.id, 'lh_security_admin', 'System Initializer' FROM users u WHERE LOWER(u.email) = 'sarah.mwamba@liec-education.com'
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+
+    INSERT INTO user_roles (user_id, role_id, assigned_by)
+    SELECT u.id, 'lh_internal', 'Sarah Mwamba (Admin)' FROM users u WHERE LOWER(u.email) = 'marc.kouassi@liec-education.com'
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+
+    INSERT INTO user_roles (user_id, role_id, assigned_by)
+    SELECT u.id, 'ITIL', 'Sarah Mwamba (Admin)' FROM users u WHERE LOWER(u.email) = 'marc.kouassi@liec-education.com'
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+
+    INSERT INTO user_roles (user_id, role_id, assigned_by)
+    SELECT u.id, 'lh_finance', 'Sarah Mwamba (Admin)' FROM users u WHERE LOWER(u.email) = 'alain.kanza@liec-education.com'
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+  `);
+
   // Ensure new AVI columns exist on existing database tables
   await client.exec(`
     ALTER TABLE avi_requests ADD COLUMN IF NOT EXISTS physical_address VARCHAR(220) DEFAULT 'Avenue de la Gombe, Kinshasa';
