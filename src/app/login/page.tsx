@@ -1,71 +1,115 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { GraduationCap, Layers, Globe, ArrowRight, ShieldCheck, Sun, Moon } from 'lucide-react';
+
+interface TestAccount {
+  roleKey: 'admin' | 'secretary' | 'avi';
+  name: string;
+  roleLabel: string;
+  email: string;
+  desc: string;
+  badgeTone: string;
+  badgeColor: string;
+  borderActive: string;
+}
+
+const TEST_ACCOUNTS: TestAccount[] = [
+  {
+    roleKey: 'admin',
+    name: 'Sarah Mwamba',
+    roleLabel: 'Administrateur',
+    email: 'sarah.mwamba@liec-education.com',
+    desc: 'Accès total + Gestion de rôles',
+    badgeTone: '#e7faff',
+    badgeColor: '#007da7',
+    borderActive: '#00bff3',
+  },
+  {
+    roleKey: 'secretary',
+    name: 'Marc Kouassi',
+    roleLabel: 'Secrétaire',
+    email: 'marc.kouassi@liec-education.com',
+    desc: 'Admissions, Prospects & PREPA',
+    badgeTone: '#eafbf4',
+    badgeColor: '#0c685a',
+    borderActive: '#00d2bd',
+  },
+  {
+    roleKey: 'avi',
+    name: 'Alain Kanza',
+    roleLabel: 'Officier AVI',
+    email: 'alain.kanza@liec-education.com',
+    desc: 'Guichet AVI & Rapports stats',
+    badgeTone: '#fff9e6',
+    badgeColor: '#8f6500',
+    borderActive: '#a2df35',
+  },
+];
 
 export default function LoginPage() {
   const router = useRouter();
-  const [lang, setLang] = useState<'en' | 'fr'>('en');
   const [email, setEmail] = useState('sarah.mwamba@liec-education.com');
   const [password, setPassword] = useState('LiecAdmin2025!');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
-  const [darkMode, setDarkMode] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const savedLang = localStorage.getItem('liec_lang') as 'en' | 'fr' | null;
-    if (savedLang === 'fr' || savedLang === 'en') {
-      setLang(savedLang);
-    } else {
-      setLang('en');
-      localStorage.setItem('liec_lang', 'en');
-    }
-    if (localStorage.getItem('liec_theme') === 'dark') {
-      setDarkMode(true);
-      document.documentElement.classList.add('dark');
-    }
-  }, []);
-
-  const toggleLanguage = (target: 'en' | 'fr') => {
-    setLang(target);
-    localStorage.setItem('liec_lang', target);
+  const selectAccount = (acc: TestAccount) => {
+    setEmail(acc.email);
+    setPassword('LiecAdmin2025!');
+    setError(null);
   };
-
-  const toggleTheme = () => {
-    setDarkMode((prev) => {
-      const next = !prev;
-      document.documentElement.classList.toggle('dark', next);
-      localStorage.setItem('liec_theme', next ? 'dark' : 'light');
-      return next;
-    });
-  };
-
-  const isEn = lang === 'en';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setInfoMessage(null);
+    setError(null);
+
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, remember }),
       });
-      if (res.ok) {
+      const data = await res.json();
+      if (res.ok && data.user) {
+        localStorage.setItem('liec_user', JSON.stringify(data.user));
+        localStorage.setItem('liec_role', data.user.role);
         router.push('/');
       } else {
-        setInfoMessage(
-          isEn
-            ? 'Error connecting to PostgreSQL server.'
-            : 'Erreur lors de la connexion au serveur PostgreSQL.'
-        );
+        setError(data.error || 'Identifiants invalides.');
       }
     } catch {
+      // Fallback local en cas d'indisponibilité réseau
+      const lower = email.trim().toLowerCase();
+      let matchedRole: 'admin' | 'secretary' | 'avi' = 'admin';
+      let matchedName = 'Sarah Mwamba';
+      let matchedTitle = 'Administrateur / Conseillère Senior';
+
+      if (lower.includes('marc') || lower.includes('secretary') || lower.includes('secretaire')) {
+        matchedRole = 'secretary';
+        matchedName = 'Marc Kouassi';
+        matchedTitle = 'Secrétaire Orientation & Admissions';
+      } else if (lower.includes('alain') || lower.includes('avi') || lower.includes('kanza')) {
+        matchedRole = 'avi';
+        matchedName = 'Alain Kanza';
+        matchedTitle = 'Officier Financement AVI';
+      }
+
+      const fallbackUser = {
+        id: 1,
+        name: matchedName,
+        email,
+        role: matchedRole,
+        title: matchedTitle,
+        initials: matchedName.split(' ').map((n) => n[0]).join(''),
+      };
+
+      localStorage.setItem('liec_user', JSON.stringify(fallbackUser));
+      localStorage.setItem('liec_role', fallbackUser.role);
       router.push('/');
     } finally {
       setLoading(false);
@@ -73,284 +117,544 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-[#f6f9fc] text-[#092342] dark:bg-[#071322] dark:text-slate-100">
-      {/* Left Branding Column */}
-      <section className="hidden lg:flex flex-col justify-between p-12 xl:p-16 bg-white dark:bg-[#091b2e] relative overflow-hidden border-r border-[#e5eef6] dark:border-slate-800">
-        {/* Brand Header */}
-        <Link href="/" className="inline-flex items-center gap-3 z-10 w-max">
-          <img
-            src="/logo_LIEC.jpeg"
-            alt="LIEC Logo"
-            className="h-12 w-12 rounded-2xl object-contain shadow-sm bg-white p-1 border border-slate-200 dark:border-slate-700"
-          />
-          <div>
-            <div className="text-xl font-extrabold tracking-tight text-[#092342] dark:text-white leading-none">
-              LIEC <span className="text-[#0c685a]">One</span>
-            </div>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Education Consulting & PREPA Training
-            </span>
-          </div>
-          <span className="ml-2 rounded-full bg-[#d8f6ea] px-2.5 py-0.5 text-[10px] font-extrabold text-[#0c685a]">
-            ADMIN
-          </span>
-        </Link>
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        :root {
+          --blue: #00bff3;
+          --blue-dark: #007da7;
+          --teal: #00d2bd;
+          --lime: #a2df35;
+          --ink: #17212d;
+          --muted: #64748b;
+          --line: #dfe7ee;
+          --bg: #f5f9fc;
+        }
+        * { box-sizing: border-box; }
+        .login-body-wrapper {
+          margin: 0;
+          min-height: 100vh;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 12px;
+          color: var(--ink);
+          background: var(--bg);
+          display: grid;
+          grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+        }
+        .left {
+          padding: 40px 8%;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          background: #fff;
+          position: relative;
+          overflow: hidden;
+        }
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          text-decoration: none;
+          color: inherit;
+          width: max-content;
+          position: relative;
+          z-index: 1;
+        }
+        .logo {
+          width: 62px;
+          height: 62px;
+          object-fit: contain;
+        }
+        .wordmark {
+          font-weight: 900;
+          font-size: 20px;
+          letter-spacing: -1px;
+          display: flex;
+          line-height: 1;
+        }
+        .wordmark span:nth-child(1) { color: #a2df35; }
+        .wordmark span:nth-child(2) { color: #00bff3; }
+        .wordmark span:nth-child(3) { color: #00bfae; }
+        .wordmark span:nth-child(4) { color: #00bff3; }
+        .brand-copy strong {
+          display: block;
+          font-size: 15px;
+          margin-bottom: 4px;
+        }
+        .brand-copy small {
+          font-size: 11px;
+          color: var(--muted);
+        }
+        .hero {
+          max-width: 540px;
+          position: relative;
+          z-index: 1;
+          padding: 45px 0;
+        }
+        .eyebrow {
+          font-size: 11px;
+          letter-spacing: 1.6px;
+          text-transform: uppercase;
+          font-weight: 800;
+          color: var(--blue-dark);
+        }
+        .hero h1 {
+          font-size: clamp(30px, 4vw, 50px);
+          line-height: 1.1;
+          letter-spacing: -1.5px;
+          margin: 16px 0;
+          color: var(--ink);
+          font-weight: 900;
+        }
+        .hero h1 em {
+          font-style: normal;
+          color: #00a9c9;
+        }
+        .hero p {
+          font-size: 15px;
+          line-height: 1.7;
+          color: #64748b;
+          max-width: 440px;
+        }
+        .feature-list {
+          display: grid;
+          gap: 13px;
+          margin-top: 28px;
+        }
+        .feature {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-size: 13px;
+          color: #405069;
+        }
+        .feature-icon {
+          width: 34px;
+          height: 34px;
+          display: grid;
+          place-items: center;
+          border-radius: 10px;
+          background: #e7faff;
+          color: #007da7;
+          font-size: 16px;
+        }
+        .left-foot {
+          color: #93a0b2;
+          font-size: 11px;
+          position: relative;
+          z-index: 1;
+        }
+        .decoration {
+          position: absolute;
+          width: 430px;
+          height: 430px;
+          border-radius: 50%;
+          border: 42px solid #e7faff;
+          right: -220px;
+          bottom: -180px;
+          pointer-events: none;
+        }
+        .right {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 36px 28px;
+          background: linear-gradient(145deg, #eafaff, #f7fffd 65%, #f5ffe9);
+        }
+        .login-card {
+          width: min(94%, 680px);
+          background: white;
+          border: 1px solid #e4edf2;
+          border-radius: 22px;
+          padding: 44px;
+          box-shadow: 0 24px 70px rgba(20, 65, 90, 0.10);
+        }
+        .mobile-brand {
+          display: none;
+          margin-bottom: 28px;
+        }
+        .login-card h2 {
+          font-size: 24px;
+          letter-spacing: -0.5px;
+          margin: 0 0 8px;
+          font-weight: 800;
+          color: var(--ink);
+        }
+        .sub {
+          color: var(--muted);
+          font-size: 13px;
+          line-height: 1.6;
+          margin: 0 0 26px;
+        }
+        .field {
+          display: grid;
+          gap: 8px;
+          margin-bottom: 17px;
+        }
+        label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #42516a;
+        }
+        input {
+          width: 100%;
+          border: 1px solid #d9e2eb;
+          border-radius: 10px;
+          padding: 13px 14px;
+          font: 14px Arial, Helvetica, sans-serif;
+          outline: none;
+          background: #fff;
+          color: #17212d;
+        }
+        input:focus {
+          border-color: var(--blue);
+          box-shadow: 0 0 0 3px rgba(0, 191, 243, 0.12);
+        }
+        .password-wrap {
+          position: relative;
+        }
+        .password-wrap input {
+          padding-right: 72px;
+        }
+        .show-pass {
+          position: absolute;
+          right: 10px;
+          top: 10px;
+          border: 0;
+          background: transparent;
+          color: #007da7;
+          font-weight: 700;
+          font-size: 11px;
+          padding: 6px;
+          cursor: pointer;
+        }
+        .row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin: 4px 0 22px;
+          font-size: 11px;
+          color: var(--muted);
+        }
+        .remember {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          cursor: pointer;
+        }
+        .remember input {
+          width: 14px;
+          height: 14px;
+          accent-color: var(--blue);
+          cursor: pointer;
+        }
+        a {
+          color: #007da7;
+          text-decoration: none;
+          font-weight: 700;
+        }
+        a:hover {
+          text-decoration: underline;
+        }
+        .submit {
+          width: 100%;
+          border: 0;
+          border-radius: 10px;
+          padding: 14px;
+          background: var(--blue);
+          color: #00364a;
+          font-size: 13px;
+          font-weight: 800;
+          cursor: pointer;
+          box-shadow: 0 7px 16px rgba(0, 191, 243, 0.16);
+          transition: background 0.15s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+        }
+        .submit:hover {
+          background: #36cdf6;
+        }
+        .submit:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+        .divider {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          color: #9aa7b8;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 1.2px;
+          text-transform: uppercase;
+          margin: 22px 0 16px;
+        }
+        .divider:before, .divider:after {
+          content: "";
+          height: 1px;
+          background: #e8edf2;
+          flex: 1;
+        }
+        .demo-note {
+          background: #f3fbff;
+          border: 1px solid #d9f4ff;
+          border-radius: 10px;
+          padding: 12px;
+          color: #557187;
+          font-size: 11px;
+          line-height: 1.55;
+          margin-top: 18px;
+        }
+        .error {
+          background: #fff1f2;
+          border: 1px solid #ffd7dc;
+          color: #a52d3b;
+          border-radius: 9px;
+          padding: 10px;
+          margin-bottom: 14px;
+          font-size: 11px;
+        }
+        .role-cards-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+          margin-bottom: 6px;
+        }
+        .role-card {
+          border: 1.5px solid #e4edf2;
+          border-radius: 12px;
+          padding: 12px 10px;
+          text-align: left;
+          background: #fafcfe;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .role-card:hover {
+          background: #fff;
+          border-color: #00bff3;
+          box-shadow: 0 4px 12px rgba(0, 191, 243, 0.08);
+        }
+        .role-card.active {
+          border-color: #00bff3;
+          background: #f0faff;
+          box-shadow: 0 0 0 2px rgba(0, 191, 243, 0.2);
+        }
+        .role-badge {
+          display: inline-block;
+          font-size: 9px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          padding: 2px 6px;
+          border-radius: 6px;
+          width: max-content;
+        }
+        .role-name {
+          font-size: 12px;
+          font-weight: 800;
+          color: #17212d;
+          margin-top: 2px;
+        }
+        .role-desc {
+          font-size: 10px;
+          color: #64748b;
+          line-height: 1.35;
+        }
+        @media (max-width: 850px) {
+          .login-body-wrapper {
+            grid-template-columns: 1fr;
+          }
+          .left {
+            display: none;
+          }
+          .right {
+            min-height: 100vh;
+            padding: 20px 14px;
+          }
+          .login-card {
+            padding: 27px 22px;
+          }
+          .mobile-brand {
+            display: flex;
+          }
+          .role-cards-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}} />
 
-        {/* Hero Copy */}
-        <div className="max-w-lg z-10 my-auto py-12 space-y-5">
-          <div className="text-xs font-extrabold uppercase tracking-widest text-[#0c685a]">
-            LIEC ONE · EDUCATION MANAGEMENT
-          </div>
-          <h1 className="text-4xl xl:text-5xl font-extrabold tracking-tight text-[#092342] dark:text-white leading-[1.12]">
-            Helping students build their <span className="text-[#0c685a]">future.</span>
-          </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-            {isEn
-              ? 'A secure single workspace to coordinate received applications, prospect CRM, Campus France university applications, PREPA training, and YimmiLine AVI financing.'
-              : 'Un espace unique et sécurisé pour coordonner les demandes reçues, le CRM prospects, les candidatures Campus France, la formation PREPA et le financement AVI YimmiLine.'}
-          </p>
-
-          <div className="space-y-3.5 pt-3">
-            <div className="flex items-center gap-3.5 text-xs font-bold text-slate-700 dark:text-slate-200">
-              <span className="h-9 w-9 rounded-xl bg-[#e0f8ef] text-[#0c685a] flex items-center justify-center shrink-0">
-                <GraduationCap className="w-4 h-4" />
-              </span>
-              <span>
-                {isEn
-                  ? 'Candidate dossier tracking and Campus France admission milestones'
-                  : 'Suivi des dossiers candidats et jalons d’admission Campus France'}
-              </span>
-            </div>
-            <div className="flex items-center gap-3.5 text-xs font-bold text-slate-700 dark:text-slate-200">
-              <span className="h-9 w-9 rounded-xl bg-[#eef4fb] text-[#092342] flex items-center justify-center shrink-0">
-                <Layers className="w-4 h-4" />
-              </span>
-              <span>
-                {isEn
-                  ? 'LIEC education consulting and PREPA training management (Kinshasa, Brazzaville & Lyon)'
-                  : 'Conseil éducatif LIEC et gestion PREPA (Kinshasa, Brazzaville & Lyon)'}
-              </span>
-            </div>
-            <div className="flex items-center gap-3.5 text-xs font-bold text-slate-700 dark:text-slate-200">
-              <span className="h-9 w-9 rounded-xl bg-[#fef4d6] text-[#b87c08] flex items-center justify-center shrink-0">
-                <Globe className="w-4 h-4" />
-              </span>
-              <span>
-                {isEn
-                  ? 'International services, YimmiLine AVI financing (Classic, Partial 1, Partial 2)'
-                  : 'Services internationaux, financement AVI YimmiLine (Classique, Partiel 1, Partiel 2)'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="text-xs text-slate-400 z-10">
-          © 2026 LIEC Education (LIEC One) · {isEn ? 'Authorized Staff Portal' : 'Espace sécurisé réservé au personnel autorisé'}
-        </div>
-
-        {/* Decorative Circle */}
-        <div className="pointer-events-none absolute -right-44 -bottom-44 h-[420px] w-[420px] rounded-full border-[44px] border-[#eefaf6] dark:border-slate-800/40" />
-      </section>
-
-      {/* Right Sign-In Column */}
-      <section className="flex items-center justify-center p-6 sm:p-10 bg-gradient-to-br from-[#eefaf6] via-[#f6f9fc] to-[#eef5fc] dark:from-[#071322] dark:via-[#091b2e] dark:to-[#071322]">
-        <div className="w-full max-w-xl rounded-3xl bg-white dark:bg-[#0c223a] border border-[#e5eef6] dark:border-slate-800 p-8 sm:p-11 shadow-elevated space-y-6">
-          <div className="flex items-center justify-between gap-2">
+      <div className="login-body-wrapper">
+        {/* Left Branding Column */}
+        <section className="left">
+          <Link href="/" className="brand" aria-label="LIEC One home">
+            <img className="logo" src="/logo_LIEC.jpeg" alt="LIEC logo" />
             <div>
-              <h2 className="text-2xl font-extrabold text-[#092342] dark:text-white">
-                {isEn ? 'LIEC Workspace Login' : 'Connexion Espace LIEC'}
-              </h2>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                {isEn
-                  ? 'Sign in to access your administration dashboard (2025–2026 Cohort).'
-                  : 'Connectez-vous pour accéder à votre tableau de bord (Cohorte 2025–2026).'}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Language Switcher */}
-              <div className="inline-flex items-center rounded-xl border border-[#ccece2] bg-[#f0faf7] dark:bg-slate-800 dark:border-slate-700 p-1 shadow-xs">
-                <button
-                  type="button"
-                  onClick={() => toggleLanguage('en')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-extrabold transition ${
-                    lang === 'en'
-                      ? 'bg-[#0c685a] text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-[#092342]'
-                  }`}
-                >
-                  EN
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleLanguage('fr')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-extrabold transition ${
-                    lang === 'fr'
-                      ? 'bg-[#0c685a] text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-[#092342]'
-                  }`}
-                >
-                  FR
-                </button>
+              <div className="wordmark">
+                <span>L</span>
+                <span>I</span>
+                <span>E</span>
+                <span>C</span>
               </div>
+              <div className="brand-copy">
+                <strong>LIEC One</strong>
+                <small>Education management</small>
+              </div>
+            </div>
+          </Link>
 
-              {/* Theme Toggle */}
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[#e6eef6] dark:border-slate-700 bg-[#f1f6fb] dark:bg-slate-800 px-3 py-2 text-xs font-extrabold text-[#092342] dark:text-slate-200 shrink-0"
-              >
-                {darkMode ? (
-                  <>
-                    <Sun className="w-4 h-4 text-[#f4be37]" />
-                    <span>{isEn ? 'Light' : 'Clair'}</span>
-                  </>
-                ) : (
-                  <>
-                    <Moon className="w-4 h-4 text-[#092342]" />
-                    <span>{isEn ? 'Dark' : 'Sombre'}</span>
-                  </>
-                )}
-              </button>
+          <div className="hero">
+            <div className="eyebrow">LIEC ONE · EDUCATION MANAGEMENT</div>
+            <h1>
+              Helping students build their <em>future.</em>
+            </h1>
+            <p>
+              A single workspace to coordinate student admissions, training, finances and international student services.
+            </p>
+
+            <div className="feature-list">
+              <div className="feature">
+                <span className="feature-icon">♙</span> Student records and admissions tracking
+              </div>
+              <div className="feature">
+                <span className="feature-icon">▣</span> LIEC education consulting and PREPA training management
+              </div>
+              <div className="feature">
+                <span className="feature-icon">⌂</span> International services and partner requests
+              </div>
             </div>
           </div>
 
-          {infoMessage && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-900/60 p-3 text-xs text-amber-800 dark:text-amber-200 font-medium">
-              {infoMessage}
-            </div>
-          )}
+          <div className="left-foot">
+            © 2026 LIEC One · Secure workspace for authorized staff
+          </div>
+          <div className="decoration" />
+        </section>
 
-          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-            <div>
-              <label className="block font-extrabold text-slate-700 dark:text-slate-300 mb-1.5">
-                {isEn ? 'Professional Email Address' : 'Adresse e-mail professionnelle'}
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="sarah.mwamba@liec-education.com"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 px-4 py-3 text-sm text-[#092342] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0c685a]/25"
-              />
-            </div>
+        {/* Right Authentication Form Column */}
+        <section className="right">
+          <div className="login-card">
+            <Link href="/" className="brand mobile-brand" aria-label="LIEC One home">
+              <img className="logo" src="/logo_LIEC.jpeg" alt="LIEC logo" />
+              <div>
+                <div className="wordmark">
+                  <span>L</span>
+                  <span>I</span>
+                  <span>E</span>
+                  <span>C</span>
+                </div>
+                <div className="brand-copy">
+                  <strong>LIEC One</strong>
+                  <small>Education management</small>
+                </div>
+              </div>
+            </Link>
 
-            <div>
-              <label className="block font-extrabold text-slate-700 dark:text-slate-300 mb-1.5">
-                {isEn ? 'Password' : 'Mot de passe'}
-              </label>
-              <div className="relative">
+            <h2>Welcome back</h2>
+            <p className="sub">Sign in to your LIEC One workspace.</p>
+
+            {error && <div className="error">{error}</div>}
+
+            <form onSubmit={handleSubmit}>
+              <div className="field">
+                <label htmlFor="email">Work email</label>
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="you@liec.example"
+                  autoComplete="username"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isEn ? 'Enter your password' : 'Entrez votre mot de passe'}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 pl-4 pr-20 py-3 text-sm text-[#092342] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0c685a]/25"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-extrabold text-[#0c685a] hover:underline px-2 py-1"
-                >
-                  {showPassword ? (isEn ? 'Hide' : 'Masquer') : isEn ? 'Show' : 'Afficher'}
-                </button>
               </div>
+
+              <div className="field">
+                <label htmlFor="password">Password</label>
+                <div className="password-wrap">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    className="show-pass"
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="row">
+                <label className="remember">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                  />
+                  Remember me
+                </label>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setError('Veuillez contacter l’administrateur système LIEC pour réinitialiser vos identifiants.');
+                  }}
+                >
+                  Forgot password?
+                </a>
+              </div>
+
+              <button className="submit" type="submit" disabled={loading}>
+                <span>{loading ? 'Authenticating...' : 'Sign in'}</span>
+                <span aria-hidden="true">→</span>
+              </button>
+            </form>
+
+            <div className="divider">COMPTES DE TEST AUTORISÉS</div>
+
+            <div className="role-cards-grid">
+              {TEST_ACCOUNTS.map((acc) => {
+                const isSelected = email.toLowerCase() === acc.email.toLowerCase();
+                return (
+                  <button
+                    key={acc.email}
+                    type="button"
+                    onClick={() => selectAccount(acc)}
+                    className={`role-card ${isSelected ? 'active' : ''}`}
+                    title={`Se connecter en tant que ${acc.roleLabel}`}
+                  >
+                    <span
+                      className="role-badge"
+                      style={{ background: acc.badgeTone, color: acc.badgeColor }}
+                    >
+                      {acc.roleLabel}
+                    </span>
+                    <div className="role-name">{acc.name}</div>
+                    <div className="role-desc">{acc.desc}</div>
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="flex items-center justify-between pt-1">
-              <label className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-400 font-medium cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-[#0c685a]"
-                />
-                <span>{isEn ? 'Keep session active' : 'Maintenir la session active'}</span>
-              </label>
-              <button
-                type="button"
-                onClick={() =>
-                  setInfoMessage(
-                    isEn
-                      ? 'To reset your staff credentials, please contact the LIEC system administrator.'
-                      : 'Pour réinitialiser votre accès, veuillez contacter l’administrateur système LIEC.'
-                  )
-                }
-                className="font-extrabold text-[#0c685a] hover:underline"
-              >
-                {isEn ? 'Forgot password?' : 'Mot de passe oublié ?'}
-              </button>
+            <div className="demo-note">
+              <strong>Espace sécurisé par rôle :</strong> Cliquez sur l'un des trois comptes ci-dessus pour préremplir votre identifiant et tester les permissions par rôle dans le workspace LIEC One.
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-[#0c6358] hover:bg-[#094e45] text-white py-3.5 text-xs font-extrabold shadow-sm flex items-center justify-center gap-2 transition"
-            >
-              <span>
-                {loading
-                  ? isEn
-                    ? 'Authenticating with PostgreSQL...'
-                    : 'Authentification PostgreSQL...'
-                  : isEn
-                  ? 'Sign in to LIEC One'
-                  : 'Se connecter à LIEC One'}
-              </span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </form>
-
-          <div className="relative flex items-center justify-center">
-            <div className="border-t border-slate-200 dark:border-slate-700 w-full" />
-            <span className="bg-white dark:bg-[#0c223a] px-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-              {isEn ? 'PRECONFIGURED DEMO ACCOUNTS' : 'COMPTES DÉMO PRÉCONFIGURÉS'}
-            </span>
-            <div className="border-t border-slate-200 dark:border-slate-700 w-full" />
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
-            {[
-              {
-                name: 'Sarah Mwamba',
-                role: isEn ? 'Admin / Senior' : 'Admin / Senior',
-                email: 'sarah.mwamba@liec-education.com',
-              },
-              {
-                name: 'Marc Kouassi',
-                role: isEn ? 'Secretariat' : 'Secrétariat',
-                email: 'marc.kouassi@liec-education.com',
-              },
-              {
-                name: 'Alain Kanza',
-                role: isEn ? 'AVI Officer' : 'Officier AVI',
-                email: 'alain.kanza@liec-education.com',
-              },
-            ].map((u) => (
-              <button
-                key={u.email}
-                type="button"
-                onClick={() => setEmail(u.email)}
-                className="rounded-xl border border-slate-200 dark:border-slate-700 hover:border-[#0c685a] bg-[#f8fbff] dark:bg-slate-900/60 p-2.5 text-left transition"
-              >
-                <div className="font-extrabold text-[#092342] dark:text-white">{u.name}</div>
-                <div className="text-[10px] text-[#0c685a] font-bold">{u.role}</div>
-              </button>
-            ))}
-          </div>
-
-          <div className="rounded-xl border border-[#ccece2] dark:border-slate-700 bg-[#f2fbf8] dark:bg-slate-900/40 p-3.5 flex items-start gap-2.5 text-[11px] text-slate-600 dark:text-slate-300">
-            <ShieldCheck className="w-4 h-4 text-[#0c685a] shrink-0 mt-0.5" />
-            <span>
-              <strong>{isEn ? 'PostgreSQL Authentication Connected:' : 'Authentification PostgreSQL connectée :'}</strong>{' '}
-              {isEn
-                ? 'All staff sign-in events are logged in the audit_logs table.'
-                : 'Toutes les connexions du personnel sont consignées dans la table audit_logs.'}
-            </span>
-          </div>
-        </div>
-      </section>
-    </div>
+        </section>
+      </div>
+    </>
   );
 }

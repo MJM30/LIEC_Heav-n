@@ -86,6 +86,8 @@ export default function LiecWorkspacePage() {
   const [lang, setLang] = useState<Lang>('en'); // English as primary language by default
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'secretary' | 'avi'>('admin');
   const [rolePreview, setRolePreview] = useState<'admin' | 'secretary' | 'avi'>('admin');
   const [globalSearch, setGlobalSearch] = useState('');
   const [showNewDemandeModal, setShowNewDemandeModal] = useState(false);
@@ -155,10 +157,31 @@ export default function LiecWorkspacePage() {
   useEffect(() => {
     fetchWorkspace();
 
-    // Load saved language preference (English is primary/default)
+    // Load authenticated user & role
+    const savedUserStr = localStorage.getItem('liec_user');
+    if (savedUserStr) {
+      try {
+        const u = JSON.parse(savedUserStr);
+        setCurrentUser(u);
+        if (u.role === 'admin' || u.role === 'secretary' || u.role === 'avi') {
+          setUserRole(u.role);
+          setRolePreview(u.role);
+          if (u.role === 'avi') {
+            setActiveTab('services');
+          } else {
+            setActiveTab('overview');
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Load saved language preference (French by default if not set)
     const savedLang = localStorage.getItem('liec_lang') as Lang | null;
     if (savedLang === 'fr' || savedLang === 'en') {
       setLang(savedLang);
+    } else {
+      setLang('fr');
+      localStorage.setItem('liec_lang', 'fr');
     }
 
     // Load theme
@@ -168,6 +191,17 @@ export default function LiecWorkspacePage() {
       document.documentElement.classList.add('dark');
     }
   }, [fetchWorkspace]);
+
+  useEffect(() => {
+    // Automatically enforce tab restrictions for current role
+    if (!isNavVisible(activeTab)) {
+      if (rolePreview === 'avi') {
+        setActiveTab('services');
+      } else {
+        setActiveTab('overview');
+      }
+    }
+  }, [rolePreview, activeTab]);
 
   const toggleLanguage = (targetLang: Lang) => {
     setLang(targetLang);
@@ -648,8 +682,12 @@ export default function LiecWorkspacePage() {
         <div className="p-3 border-t border-[#eef3f8]">
           <div className="rounded-2xl border border-[#e6eef6] bg-[#f8fbff] p-2.5 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-9 w-9 rounded-full bg-[#092342] text-white flex items-center justify-center shrink-0">
-                <User className="w-4 h-4" />
+              <div className="h-9 w-9 rounded-full bg-[#092342] text-white flex items-center justify-center shrink-0 font-extrabold text-xs">
+                {rolePreview === 'secretary'
+                  ? 'MK'
+                  : rolePreview === 'avi'
+                  ? 'AK'
+                  : currentUser?.initials || 'SM'}
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-extrabold text-[#092342] truncate">
@@ -657,22 +695,26 @@ export default function LiecWorkspacePage() {
                     ? 'Marc Kouassi'
                     : rolePreview === 'avi'
                     ? 'Alain Kanza'
-                    : 'Sarah Mwamba'}
+                    : currentUser?.name || 'Sarah Mwamba'}
                 </div>
                 <div className="text-[10.5px] text-slate-500 truncate">
                   {rolePreview === 'secretary'
                     ? isEn ? 'Secretary (Orientation)' : 'Secrétaire Orientation'
                     : rolePreview === 'avi'
-                    ? isEn ? 'AVI Officer (Financing)' : 'Officier AVI'
-                    : isEn ? 'Senior Advisor' : 'Conseillère Senior'}
+                    ? isEn ? 'AVI Officer (Financing)' : 'Officier Financement AVI'
+                    : isEn ? 'Administrator / Senior Advisor' : 'Administrateur / Conseillère Senior'}
                 </div>
               </div>
             </div>
 
             <button
-              onClick={() => router.push('/login')}
-              title={isEn ? 'Log out (Login Page)' : 'Se déconnecter (Page Login)'}
-              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/70 hover:text-[#092342] transition shrink-0"
+              onClick={() => {
+                localStorage.removeItem('liec_user');
+                localStorage.removeItem('liec_role');
+                router.push('/login');
+              }}
+              title={isEn ? 'Log out' : 'Se déconnecter'}
+              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/70 hover:text-[#092342] transition shrink-0 cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -758,40 +800,50 @@ export default function LiecWorkspacePage() {
               </button>
             </div>
 
-            {/* Role Switcher: Admin | Secretary | AVI Officer */}
-            <select
-              value={rolePreview}
-              onChange={(e) => {
-                const nextRole = e.target.value as 'admin' | 'secretary' | 'avi';
-                setRolePreview(nextRole);
-                if (nextRole === 'avi') {
-                  setActiveTab('services'); // Direct navigation to AVI module for AVI Officer
-                }
-                showToast(
-                  isEn
-                    ? `Role switched to: ${
-                        nextRole === 'admin'
-                          ? 'Administrator / Senior Advisor'
-                          : nextRole === 'secretary'
-                          ? 'Secretary'
-                          : 'AVI Officer (Financing Desk)'
-                      }`
-                    : `Aperçu du rôle changé : ${
-                        nextRole === 'admin'
-                          ? 'Administrateur / Conseillère Senior'
-                          : nextRole === 'secretary'
-                          ? 'Secrétaire'
-                          : 'Officier AVI (Guichet Financement)'
-                      }`
-                );
-              }}
-              aria-label={isEn ? 'Role preview' : 'Aperçu du rôle'}
-              className="hidden xl:block rounded-xl border border-[#e6eef6] bg-[#f8fbff] px-2.5 py-1.5 text-[11px] font-bold text-slate-700 focus:outline-none cursor-pointer"
-            >
-              <option value="admin">{isEn ? 'Role: Admin (Full)' : 'Rôle : Admin (Complet)'}</option>
-              <option value="secretary">{isEn ? 'Role: Secretary' : 'Rôle : Secrétaire'}</option>
-              <option value="avi">{isEn ? 'Role: AVI Officer' : 'Rôle : Officier AVI'}</option>
-            </select>
+            {/* Role Management Dropdown / Tab - EXCLUSIVELY for Administrator */}
+            {userRole === 'admin' && (
+              <div className="flex items-center gap-1.5 rounded-xl border border-[#bbf0df] bg-[#eefaf6] px-2.5 py-1 shadow-xs">
+                <span className="text-[11px] font-extrabold text-[#0c685a] flex items-center gap-1.5">
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-[#0c685a]" />
+                  <span className="hidden sm:inline">{isEn ? 'Role Mode:' : 'Gestion de rôles :'}</span>
+                </span>
+                <select
+                  value={rolePreview}
+                  onChange={(e) => {
+                    const nextRole = e.target.value as 'admin' | 'secretary' | 'avi';
+                    setRolePreview(nextRole);
+                    if (nextRole === 'avi') {
+                      setActiveTab('services');
+                    } else {
+                      setActiveTab('overview');
+                    }
+                    showToast(
+                      isEn
+                        ? `Role switched to: ${
+                            nextRole === 'admin'
+                              ? 'Administrator / Senior Advisor'
+                              : nextRole === 'secretary'
+                              ? 'Secretary'
+                              : 'AVI Officer'
+                          }`
+                        : `Aperçu du rôle changé : ${
+                            nextRole === 'admin'
+                              ? 'Administrateur / Conseillère Senior'
+                              : nextRole === 'secretary'
+                              ? 'Secrétaire'
+                              : 'Officier AVI'
+                          }`
+                    );
+                  }}
+                  aria-label="Gestion de rôles"
+                  className="rounded-lg border border-[#ccece2] bg-white px-2 py-1 text-xs font-extrabold text-[#092342] focus:outline-none cursor-pointer"
+                >
+                  <option value="admin">{isEn ? '👑 Administrator (All Roles)' : '👑 Administrateur (Tous les rôles)'}</option>
+                  <option value="secretary">{isEn ? '📋 Secretary (Restricted)' : '📋 Secrétaire (Accès Restreint)'}</option>
+                  <option value="avi">{isEn ? '✈️ AVI Officer (Desk & Stats)' : '✈️ Officier AVI (Guichet & Stats)'}</option>
+                </select>
+              </div>
+            )}
 
             {/* Cohort Pill */}
             <div className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-[#f1f6fb] px-3 py-2 text-xs font-bold text-[#092342]">
