@@ -4,64 +4,14 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-interface TestAccount {
-  roleKey: 'admin' | 'secretary' | 'avi';
-  name: string;
-  roleLabel: string;
-  email: string;
-  desc: string;
-  badgeTone: string;
-  badgeColor: string;
-  borderActive: string;
-}
-
-const TEST_ACCOUNTS: TestAccount[] = [
-  {
-    roleKey: 'admin',
-    name: 'Sarah Mwamba',
-    roleLabel: 'Administrateur',
-    email: 'sarah.mwamba@liec-education.com',
-    desc: 'Accès total + Gestion de rôles',
-    badgeTone: '#e7faff',
-    badgeColor: '#007da7',
-    borderActive: '#00bff3',
-  },
-  {
-    roleKey: 'secretary',
-    name: 'Marc Kouassi',
-    roleLabel: 'Secrétaire',
-    email: 'marc.kouassi@liec-education.com',
-    desc: 'Admissions, Prospects & PREPA',
-    badgeTone: '#eafbf4',
-    badgeColor: '#0c685a',
-    borderActive: '#00d2bd',
-  },
-  {
-    roleKey: 'avi',
-    name: 'Alain Kanza',
-    roleLabel: 'Officier AVI',
-    email: 'alain.kanza@liec-education.com',
-    desc: 'Guichet AVI & Rapports stats',
-    badgeTone: '#fff9e6',
-    badgeColor: '#8f6500',
-    borderActive: '#a2df35',
-  },
-];
-
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('sarah.mwamba@liec-education.com');
-  const [password, setPassword] = useState('LiecAdmin2025!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const selectAccount = (acc: TestAccount) => {
-    setEmail(acc.email);
-    setPassword('LiecAdmin2025!');
-    setError(null);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +52,7 @@ export default function LoginPage() {
       const fallbackUser = {
         id: 1,
         name: matchedName,
-        email,
+        email: email || 'sarah.mwamba@liec-education.com',
         role: matchedRole,
         title: matchedTitle,
         initials: matchedName.split(' ').map((n) => n[0]).join(''),
@@ -416,55 +366,6 @@ export default function LoginPage() {
           margin-bottom: 14px;
           font-size: 11px;
         }
-        .role-cards-grid {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 10px;
-          margin-bottom: 6px;
-        }
-        .role-card {
-          border: 1.5px solid #e4edf2;
-          border-radius: 12px;
-          padding: 12px 10px;
-          text-align: left;
-          background: #fafcfe;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-        .role-card:hover {
-          background: #fff;
-          border-color: #00bff3;
-          box-shadow: 0 4px 12px rgba(0, 191, 243, 0.08);
-        }
-        .role-card.active {
-          border-color: #00bff3;
-          background: #f0faff;
-          box-shadow: 0 0 0 2px rgba(0, 191, 243, 0.2);
-        }
-        .role-badge {
-          display: inline-block;
-          font-size: 9px;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          padding: 2px 6px;
-          border-radius: 6px;
-          width: max-content;
-        }
-        .role-name {
-          font-size: 12px;
-          font-weight: 800;
-          color: #17212d;
-          margin-top: 2px;
-        }
-        .role-desc {
-          font-size: 10px;
-          color: #64748b;
-          line-height: 1.35;
-        }
         @media (max-width: 850px) {
           .login-body-wrapper {
             grid-template-columns: 1fr;
@@ -481,9 +382,6 @@ export default function LoginPage() {
           }
           .mobile-brand {
             display: flex;
-          }
-          .role-cards-grid {
-            grid-template-columns: 1fr;
           }
         }
       `}} />
@@ -623,34 +521,10 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <div className="divider">COMPTES DE TEST AUTORISÉS</div>
-
-            <div className="role-cards-grid">
-              {TEST_ACCOUNTS.map((acc) => {
-                const isSelected = email.toLowerCase() === acc.email.toLowerCase();
-                return (
-                  <button
-                    key={acc.email}
-                    type="button"
-                    onClick={() => selectAccount(acc)}
-                    className={`role-card ${isSelected ? 'active' : ''}`}
-                    title={`Se connecter en tant que ${acc.roleLabel}`}
-                  >
-                    <span
-                      className="role-badge"
-                      style={{ background: acc.badgeTone, color: acc.badgeColor }}
-                    >
-                      {acc.roleLabel}
-                    </span>
-                    <div className="role-name">{acc.name}</div>
-                    <div className="role-desc">{acc.desc}</div>
-                  </button>
-                );
-              })}
-            </div>
+            <div className="divider">STAFF ACCESS</div>
 
             <div className="demo-note">
-              <strong>Espace sécurisé par rôle :</strong> Cliquez sur l'un des trois comptes ci-dessus pour préremplir votre identifiant et tester les permissions par rôle dans le workspace LIEC One.
+              <strong>Espace réservé :</strong> Seul le personnel autorisé de LIEC Education peut accéder à cet espace de travail sécurisé.
             </div>
           </div>
         </section>
