@@ -1109,6 +1109,14 @@ export default function LiecWorkspacePage() {
                 <OverviewScreen
                   demandes={demandes}
                   priorityTasks={priorityTasks}
+                  userName={
+                    rolePreview === 'secretary' && currentUser?.role !== 'secretary'
+                      ? 'Marc Kouassi'
+                      : rolePreview === 'avi' && currentUser?.role !== 'avi'
+                      ? 'Alain Kanza'
+                      : currentUser?.name || ''
+                  }
+                  currentUser={currentUser}
                   onNavigate={(tab) => setActiveTab(tab as NavTab)}
                   onOpenNewDemande={() => {
                     if (rolePreview === 'avi') return;

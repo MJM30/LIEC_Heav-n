@@ -2668,11 +2668,11 @@ export function ParametresGovernanceScreen({
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="border-b border-slate-100 bg-[#f8fafc] text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                        <th className="py-3 px-4">Utilisateur / Compte</th>
-                        <th className="py-3 px-4">Profil Métier</th>
-                        <th className="py-3 px-4">Rôles Techniques Assignés</th>
-                        <th className="py-3 px-4">Statut</th>
-                        <th className="py-3 px-4 text-right">Actions Admin</th>
+                        <th className="py-3 px-4">{isEn ? 'User / Account' : 'Utilisateur / Compte'}</th>
+                        <th className="py-3 px-4">{isEn ? 'Business Profile' : 'Profil Métier'}</th>
+                        <th className="py-3 px-4">{isEn ? 'Assigned Technical Roles' : 'Rôles Techniques Assignés'}</th>
+                        <th className="py-3 px-4">{isEn ? 'Status' : 'Statut'}</th>
+                        <th className="py-3 px-4 text-right">{isEn ? 'Admin Actions' : 'Actions Admin'}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -2716,7 +2716,7 @@ export function ParametresGovernanceScreen({
                                     </span>
                                   ))
                                 ) : (
-                                  <span className="text-[10px] text-slate-400 italic">Aucun rôle</span>
+                                  <span className="text-[10px] text-slate-400 italic">{isEn ? 'No role' : 'Aucun rôle'}</span>
                                 )}
                               </div>
                             </td>
@@ -2724,16 +2724,16 @@ export function ParametresGovernanceScreen({
                               {u.active ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-[#dcfce7] text-[#15803d] px-2.5 py-0.5 text-[10.5px] font-extrabold">
                                   <CheckCircle2 className="w-3 h-3" />
-                                  <span>Actif</span>
+                                  <span>{isEn ? 'Active' : 'Actif'}</span>
                                 </span>
                               ) : (
                                 <div>
                                   <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2.5 py-0.5 text-[10.5px] font-extrabold">
                                     <AlertTriangle className="w-3 h-3" />
-                                    <span>Suspendu</span>
+                                    <span>{isEn ? 'Suspended' : 'Suspendu'}</span>
                                   </span>
                                   {u.suspended_by && (
-                                    <div className="text-[9.5px] text-red-500 mt-0.5">Par {u.suspended_by}</div>
+                                    <div className="text-[9.5px] text-red-500 mt-0.5">{isEn ? `By ${u.suspended_by}` : `Par ${u.suspended_by}`}</div>
                                   )}
                                 </div>
                               )}
@@ -2744,17 +2744,17 @@ export function ParametresGovernanceScreen({
                                   onClick={() => handleOpenEditRoles(u)}
                                   className="rounded-lg border border-slate-200 hover:border-[#0c685a] bg-white px-2.5 py-1 text-[11px] font-extrabold text-[#092342] hover:text-[#0c685a] transition"
                                 >
-                                  Modifier rôles
+                                  {isEn ? 'Edit roles' : 'Modifier rôles'}
                                 </button>
                                 <button
                                   onClick={() => handleToggleSuspend(u)}
                                   disabled={loadingAction || u.email === currentUser?.email}
                                   title={
                                     u.email === currentUser?.email
-                                      ? 'Impossible de suspendre votre propre compte connecté'
+                                      ? (isEn ? 'Cannot suspend your own logged-in account' : 'Impossible de suspendre votre propre compte connecté')
                                       : u.active
-                                      ? 'Suspendre immédiatement le compte'
-                                      : 'Réactiver le compte'
+                                      ? (isEn ? 'Suspend account immediately' : 'Suspendre immédiatement le compte')
+                                      : (isEn ? 'Reactivate account' : 'Réactiver le compte')
                                   }
                                   className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition ${
                                     u.email === currentUser?.email
@@ -2764,7 +2764,7 @@ export function ParametresGovernanceScreen({
                                       : 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                                   }`}
                                 >
-                                  {u.active ? 'Suspendre' : 'Réactiver'}
+                                  {u.active ? (isEn ? 'Suspend' : 'Suspendre') : (isEn ? 'Reactivate' : 'Réactiver')}
                                 </button>
                               </div>
                             </td>
@@ -3001,7 +3001,7 @@ export function ParametresGovernanceScreen({
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-sm font-extrabold text-[#092342] flex items-center gap-2">
                 <UserPlus className="w-4 h-4 text-[#0c685a]" />
-                <span>Créer un Nouvel Utilisateur (Admin Workflow)</span>
+                <span>{isEn ? 'Create a New User (Admin Workflow)' : 'Créer un Nouvel Utilisateur (Admin Workflow)'}</span>
               </h3>
               <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
@@ -3010,31 +3010,37 @@ export function ParametresGovernanceScreen({
 
             <form onSubmit={handleSaveCreateUser} className="space-y-3.5 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Nom complet</label>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {isEn ? 'Full Name *' : 'Nom complet *'}
+                </label>
                 <input
                   type="text"
                   required
                   value={newUserName}
                   onChange={(e) => setNewUserName(e.target.value)}
-                  placeholder="ex: Jean-Paul Mbuyi"
+                  placeholder={isEn ? 'e.g. Jean-Paul Mbuyi' : 'ex: Jean-Paul Mbuyi'}
                   className="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0c685a]/20"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Email professionnel</label>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {isEn ? 'Professional Email *' : 'Email professionnel *'}
+                </label>
                 <input
                   type="email"
                   required
                   value={newUserEmail}
                   onChange={(e) => setNewUserEmail(e.target.value)}
-                  placeholder="ex: j.mbuyi@liec-education.com"
+                  placeholder={isEn ? 'e.g. j.mbuyi@liec-education.com' : 'ex: j.mbuyi@liec-education.com'}
                   className="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0c685a]/20"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Profil Métier (Business Profile)</label>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {isEn ? 'Business Profile' : 'Profil Métier (Business Profile)'}
+                </label>
                 <select
                   value={newUserProfile}
                   onChange={(e) => {
@@ -3046,14 +3052,16 @@ export function ParametresGovernanceScreen({
                   }}
                   className="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0c685a]/20 font-extrabold text-[#092342]"
                 >
-                  <option value="Secretary">Secretary (Intake & Admissions)</option>
-                  <option value="Finance Officer">Finance Officer (Blocked Finance / AVI)</option>
-                  <option value="Admin">Admin (Full System Privilege)</option>
+                  <option value="Secretary">{isEn ? 'Secretary (Intake & Admissions)' : 'Secrétaire (Intake & Admissions)'}</option>
+                  <option value="Finance Officer">{isEn ? 'Finance Officer (Blocked Finance / AVI)' : 'Officier Finance (Guichet AVI / Finances)'}</option>
+                  <option value="Admin">{isEn ? 'Admin (Full System Privilege)' : 'Admin (Privilège Système Total)'}</option>
                 </select>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Rôles Techniques à Assigner</label>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {isEn ? 'Technical Roles to Assign' : 'Rôles Techniques à Assigner'}
+                </label>
                 <div className="grid grid-cols-2 gap-2 border border-slate-200 rounded-xl p-2.5 bg-slate-50">
                   {['admin', 'lh_security_admin', 'ITIL', 'lh_internal', 'lh_finance'].map((rId) => {
                     const checked = newUserRoles.includes(rId);
@@ -3076,12 +3084,14 @@ export function ParametresGovernanceScreen({
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Intitulé de poste / Titre</label>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {isEn ? 'Job Title / Position' : 'Intitulé de poste / Titre'}
+                </label>
                 <input
                   type="text"
                   value={newUserTitle}
                   onChange={(e) => setNewUserTitle(e.target.value)}
-                  placeholder="ex: Conseiller d'orientation Lyon"
+                  placeholder={isEn ? "e.g. Lyon Admissions Advisor" : "ex: Conseiller d'orientation Lyon"}
                   className="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0c685a]/20"
                 />
               </div>
@@ -3092,14 +3102,16 @@ export function ParametresGovernanceScreen({
                   onClick={() => setShowCreateModal(false)}
                   className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-extrabold"
                 >
-                  Annuler
+                  {isEn ? 'Cancel' : 'Annuler'}
                 </button>
                 <button
                   type="submit"
                   disabled={loadingAction}
                   className="px-4 py-2 rounded-xl bg-[#0c685a] hover:bg-[#094e45] text-white font-extrabold"
                 >
-                  Enregistrer l'utilisateur
+                  {loadingAction
+                    ? (isEn ? 'Saving...' : 'Enregistrement...')
+                    : (isEn ? 'Save User' : "Enregistrer l'utilisateur")}
                 </button>
               </div>
             </form>
@@ -3114,7 +3126,9 @@ export function ParametresGovernanceScreen({
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-sm font-extrabold text-[#092342] flex items-center gap-2">
                 <Key className="w-4 h-4 text-[#0c685a]" />
-                <span>Modifier les Rôles de : {editingUser.name}</span>
+                <span>
+                  {isEn ? `Edit Roles for: ${editingUser.name}` : `Modifier les Rôles de : ${editingUser.name}`}
+                </span>
               </h3>
               <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
@@ -3123,27 +3137,46 @@ export function ParametresGovernanceScreen({
 
             <form onSubmit={handleSaveEditRoles} className="space-y-4 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Profil Métier (Business Profile)</label>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {isEn ? 'Business Profile' : 'Profil Métier (Business Profile)'}
+                </label>
                 <select
                   value={editProfile}
                   onChange={(e) => setEditProfile(e.target.value as any)}
                   className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-extrabold text-[#092342]"
                 >
-                  <option value="Secretary">Secretary</option>
-                  <option value="Finance Officer">Finance Officer (Blocked Finance / AVI)</option>
-                  <option value="Admin">Admin</option>
+                  <option value="Secretary">{isEn ? 'Secretary (Intake & Admissions)' : 'Secrétaire (Intake & Admissions)'}</option>
+                  <option value="Finance Officer">{isEn ? 'Finance Officer (Blocked Finance / AVI)' : 'Officier Finance (Guichet AVI / Finances)'}</option>
+                  <option value="Admin">{isEn ? 'Admin (Full System Privilege)' : 'Admin (Privilège Système Total)'}</option>
                 </select>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Rôles Techniques Assignés</label>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {isEn ? 'Assigned Technical Roles' : 'Rôles Techniques Assignés'}
+                </label>
                 <div className="space-y-2 border border-slate-200 rounded-xl p-3 bg-slate-50">
                   {[
-                    { id: 'admin', warn: 'Attention: Accès privilège total sur la plateforme.' },
-                    { id: 'lh_security_admin', warn: 'Administration sécurité & contrôles sensibles.' },
-                    { id: 'ITIL', warn: 'Opérateur workflows Secrétariat.' },
-                    { id: 'lh_internal', warn: 'Accès interne aux dossiers et demandes d’admission.' },
-                    { id: 'lh_finance', warn: 'Gestion Guichet AVI et financements YIMMILINE.' },
+                    {
+                      id: 'admin',
+                      warn: isEn ? 'Warning: Full platform administrator privilege.' : 'Attention: Accès privilège total sur la plateforme.',
+                    },
+                    {
+                      id: 'lh_security_admin',
+                      warn: isEn ? 'Security administration & sensitive controls.' : 'Administration sécurité & contrôles sensibles.',
+                    },
+                    {
+                      id: 'ITIL',
+                      warn: isEn ? 'Secretariat workflow operator.' : 'Opérateur workflows Secrétariat.',
+                    },
+                    {
+                      id: 'lh_internal',
+                      warn: isEn ? 'Internal access to records and admissions files.' : 'Accès interne aux dossiers et demandes d’admission.',
+                    },
+                    {
+                      id: 'lh_finance',
+                      warn: isEn ? 'AVI counter and YIMMILINE financing management.' : 'Gestion Guichet AVI et financements YIMMILINE.',
+                    },
                   ].map((r) => {
                     const checked = editRoles.includes(r.id);
                     return (
@@ -3174,14 +3207,16 @@ export function ParametresGovernanceScreen({
                   onClick={() => setEditingUser(null)}
                   className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-extrabold"
                 >
-                  Annuler
+                  {isEn ? 'Cancel' : 'Annuler'}
                 </button>
                 <button
                   type="submit"
                   disabled={loadingAction}
                   className="px-4 py-2 rounded-xl bg-[#0c685a] hover:bg-[#094e45] text-white font-extrabold"
                 >
-                  Sauvegarder les modifications
+                  {loadingAction
+                    ? (isEn ? 'Saving...' : 'Enregistrement...')
+                    : (isEn ? 'Save Changes' : 'Sauvegarder les modifications')}
                 </button>
               </div>
             </form>

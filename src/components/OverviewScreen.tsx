@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calendar,
   Plus,
@@ -33,6 +33,8 @@ interface OverviewScreenProps {
   onNotify: (msg: string) => void;
   lang?: Lang;
   userRole?: 'admin' | 'secretary' | 'avi';
+  userName?: string;
+  currentUser?: any;
 }
 
 export default function OverviewScreen({
@@ -46,8 +48,28 @@ export default function OverviewScreen({
   onNotify,
   lang = 'en',
   userRole,
+  userName,
+  currentUser,
 }: OverviewScreenProps) {
   const isEn = lang === 'en';
+  const [resolvedUserName, setResolvedUserName] = useState<string>(userName || currentUser?.name || '');
+
+  useEffect(() => {
+    if (userName) {
+      setResolvedUserName(userName);
+    } else if (currentUser?.name) {
+      setResolvedUserName(currentUser.name);
+    } else if (typeof window !== 'undefined') {
+      try {
+        const savedUserStr = localStorage.getItem('liec_user');
+        if (savedUserStr) {
+          const u = JSON.parse(savedUserStr);
+          if (u?.name) setResolvedUserName(u.name);
+        }
+      } catch {}
+    }
+  }, [userName, currentUser]);
+
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('month');
   const [cohortLabel, setCohortLabel] = useState('September 2025 Intake');
   const [searchFilter, setSearchFilter] = useState('');
@@ -94,9 +116,19 @@ export default function OverviewScreen({
             <span className="text-slate-400">Updated 8m ago</span>
           </div>
           <h1 className="text-[28px] sm:text-[31px] font-extrabold tracking-tight text-[#092342] leading-[1.18]">
-            Welcome back to your
-            <br />
-            LIEC Workspace
+            {resolvedUserName ? (
+              <>
+                {resolvedUserName}, {isEn ? 'welcome back to your' : 'bienvenue dans votre'}
+                <br />
+                {isEn ? 'LIEC Workspace!' : 'espace LIEC !'}
+              </>
+            ) : (
+              <>
+                {isEn ? 'Welcome back to your' : 'Bienvenue dans votre'}
+                <br />
+                {isEn ? 'LIEC Workspace!' : 'espace LIEC !'}
+              </>
+            )}
           </h1>
           <p className="text-[13.5px] text-slate-600 leading-relaxed">
             Monitor incoming applications, prospect pipeline, candidate files, and cohorts for the 2025–2026 academic year.
