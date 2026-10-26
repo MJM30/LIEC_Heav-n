@@ -5,6 +5,9 @@ import { getOrCreateStaff2Fa } from '@/lib/authStore';
 import { getTotpSetup } from '@/lib/totp';
 import { STAFF_ACCOUNTS } from '@/lib/staff';
 
+// 2FA Feature Toggle: Disabled (set to false) as requested by user
+export const ENABLE_2FA = false;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -50,41 +53,70 @@ export async function POST(req: NextRequest) {
       initials: matchedAccount.initials,
     };
 
-    // Retrieve or initialize Two-Factor Authentication state
-    const twoFaRecord = await getOrCreateStaff2Fa(matchedAccount.email);
+    // If 2FA is enabled, enforce Google Authenticator TOTP verification
+    if (ENABLE_2FA) {
+      const twoFaRecord = await getOrCreateStaff2Fa(matchedAccount.email);
 
+      try {
+        const db = await getDb();
+        await db.query(
+          `INSERT INTO audit_logs (actor, action, entity_ref, outcome)
+           VALUES ($1, 'Mot de passe validé - En attente 2FA Google Authenticator (' || $2 || ')', 'AUTH-PASSWORD-CHECK', 'Succès')`,
+          [matchedAccount.name, matchedAccount.role]
+        );
+      } catch (dbErr) {
+        console.warn('Database audit logging skipped:', dbErr);
+      }
+
+      if (!twoFaRecord.isActivated) {
+        // First login: Generate QR code and require activation verification
+        const setup = getTotpSetup(matchedAccount.email, twoFaRecord.secret);
+        return NextResponse.json({
+          requires2Fa: true,
+          isFirstLogin: true,
+          email: matchedAccount.email,
+          secret: twoFaRecord.secret,
+          uri: setup.uri,
+          qrSvg: setup.qrSvg,
+          user: userPayload,
+        });
+      }
+
+      // Subsequent login: Require 6-digit TOTP code
+      return NextResponse.json({
+        requires2Fa: true,
+        isFirstLogin: false,
+        email: matchedAccount.email,
+        user: userPayload,
+      });
+    }
+
+    // Direct Login (2FA Disabled): Grant immediate access with staff credentials
     try {
       const db = await getDb();
       await db.query(
         `INSERT INTO audit_logs (actor, action, entity_ref, outcome)
-         VALUES ($1, 'Mot de passe validé - En attente 2FA Google Authenticator (' || $2 || ')', 'AUTH-PASSWORD-CHECK', 'Succès')`,
+         VALUES ($1, 'Connexion réussie espace sécurisé LIEC Heav’n (' || $2 || ')', 'AUTH-SESSION', 'Succès')`,
         [matchedAccount.name, matchedAccount.role]
       );
     } catch (dbErr) {
       console.warn('Database audit logging skipped:', dbErr);
     }
 
-    if (!twoFaRecord.isActivated) {
-      // First login: Generate QR code and require activation verification
-      const setup = getTotpSetup(matchedAccount.email, twoFaRecord.secret);
-      return NextResponse.json({
-        requires2Fa: true,
-        isFirstLogin: true,
-        email: matchedAccount.email,
-        secret: twoFaRecord.secret,
-        uri: setup.uri,
-        qrSvg: setup.qrSvg,
-        user: userPayload,
-      });
-    }
-
-    // Subsequent login: Require 6-digit TOTP code
-    return NextResponse.json({
-      requires2Fa: true,
-      isFirstLogin: false,
-      email: matchedAccount.email,
+    const res = NextResponse.json({
+      authenticated: true,
+      requires2Fa: false,
       user: userPayload,
     });
+
+    res.cookies.set('liec_user_email', matchedAccount.email, {
+      path: '/',
+      httpOnly: false,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    return res;
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || 'Erreur interne du serveur auth.' },

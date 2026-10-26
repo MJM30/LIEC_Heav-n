@@ -33,6 +33,16 @@ export default function LoginPage() {
   const [twoFaData, setTwoFaData] = useState<TwoFaSetupData | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
+  // Mouse cursor tracking for responsive background logo animation
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (typeof window === 'undefined') return;
+    const x = (e.clientX / window.innerWidth) * 2 - 1;
+    const y = (e.clientY / window.innerHeight) * 2 - 1;
+    setMousePos({ x, y });
+  };
+
   const OFFLINE_STAFF_CREDENTIALS = [
     {
       role: 'admin' as const,
@@ -65,11 +75,12 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok && data.requires2Fa) {
+        // When 2FA is active
         setTwoFaData(data);
         setStep('2fa');
         setTotpCode('');
       } else if (res.ok && data.user) {
-        // Direct authentication fallback if 2FA is bypassed
+        // Direct Login (2FA Disabled): Access granted immediately
         localStorage.setItem('liec_user', JSON.stringify(data.user));
         localStorage.setItem('liec_role', data.user.role);
         document.cookie = `liec_user_email=${encodeURIComponent(data.user.email)}; path=/; max-age=604800; SameSite=Lax`;
@@ -111,12 +122,10 @@ export default function LoginPage() {
           initials: matched.role === 'admin' ? 'SM' : matched.role === 'secretary' ? 'MK' : 'AK',
         };
 
-        setTwoFaData({
-          email: matched.email,
-          isFirstLogin: false,
-          user: fallbackUser,
-        });
-        setStep('2fa');
+        localStorage.setItem('liec_user', JSON.stringify(fallbackUser));
+        localStorage.setItem('liec_role', fallbackUser.role);
+        document.cookie = `liec_user_email=${encodeURIComponent(fallbackUser.email)}; path=/; max-age=604800; SameSite=Lax`;
+        router.push('/');
       } else {
         setError('Identifiants invalides. Vérifiez l’adresse email et le mot de passe.');
       }
@@ -207,7 +216,7 @@ export default function LoginPage() {
           overflow: hidden;
         }
 
-        /* Subtle animated background watermark of official LIEC logo */
+        /* Subtle animated background watermark of official LIEC logo, responsive to mouse cursor */
         .animated-bg-logo-wrap {
           position: absolute;
           inset: 0;
@@ -218,23 +227,32 @@ export default function LoginPage() {
           align-items: center;
           justify-content: center;
         }
+        .animated-bg-logo-mover {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          will-change: transform;
+        }
         .animated-bg-logo {
-          width: min(700px, 75vw);
-          height: min(700px, 75vw);
+          width: min(720px, 75vw);
+          height: min(720px, 75vw);
           object-fit: contain;
           opacity: 0.045;
-          filter: grayscale(20%) drop-shadow(0 0 45px rgba(0, 191, 243, 0.25));
+          filter: grayscale(15%) drop-shadow(0 0 45px rgba(0, 191, 243, 0.28));
           animation: subtleLogoFloat 14s ease-in-out infinite alternate;
           transform-origin: center center;
+          pointer-events: none;
+          user-select: none;
         }
         .animated-bg-aura {
           position: absolute;
-          width: min(850px, 90vw);
-          height: min(850px, 90vw);
+          width: min(880px, 92vw);
+          height: min(880px, 92vw);
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(0, 191, 243, 0.08) 0%, rgba(0, 210, 189, 0.05) 45%, transparent 70%);
+          background: radial-gradient(circle, rgba(0, 191, 243, 0.09) 0%, rgba(0, 210, 189, 0.05) 45%, transparent 70%);
           animation: subtleAuraPulse 10s ease-in-out infinite alternate;
           pointer-events: none;
+          will-change: transform;
         }
         @keyframes subtleLogoFloat {
           0% {
@@ -242,7 +260,7 @@ export default function LoginPage() {
             opacity: 0.04;
           }
           50% {
-            transform: translateY(-16px) scale(1.03) rotate(1deg);
+            transform: translateY(-16px) scale(1.03) rotate(0.8deg);
             opacity: 0.075;
           }
           100% {
@@ -595,15 +613,29 @@ export default function LoginPage() {
         }
       `}} />
 
-      <div className="login-body-wrapper">
-        {/* Subtle, professional ambient animation of official LIEC logo in background */}
+      <div className="login-body-wrapper" onMouseMove={handleMouseMove}>
+        {/* Subtle, professional ambient animation of official LIEC logo in background, interactive with mouse cursor */}
         <div className="animated-bg-logo-wrap" aria-hidden="true">
-          <div className="animated-bg-aura" />
-          <img
-            src="/logo_LIEC.jpeg"
-            alt=""
-            className="animated-bg-logo"
+          <div
+            className="animated-bg-aura"
+            style={{
+              transform: `translate3d(${mousePos.x * -22}px, ${mousePos.y * -22}px, 0) scale(${1 + Math.abs(mousePos.x * 0.04)})`,
+              transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
           />
+          <div
+            className="animated-bg-logo-mover"
+            style={{
+              transform: `translate3d(${mousePos.x * 30}px, ${mousePos.y * 30}px, 0) rotate(${mousePos.x * 4}deg)`,
+              transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            <img
+              src="/logo_LIEC.jpeg"
+              alt=""
+              className="animated-bg-logo"
+            />
+          </div>
         </div>
 
         {/* Left Branding Column */}
@@ -739,14 +771,14 @@ export default function LoginPage() {
                   </div>
 
                   <button className="submit" type="submit" disabled={loading}>
-                    <span>{loading ? 'Verifying credentials...' : 'Sign in'}</span>
+                    <span>{loading ? 'Authenticating...' : 'Sign in'}</span>
                     <span aria-hidden="true">→</span>
                   </button>
                 </form>
               </>
             ) : (
               <>
-                {/* 2FA Step with Google Authenticator */}
+                {/* 2FA Step with Google Authenticator (Available when ENABLE_2FA is active) */}
                 <h2>
                   {twoFaData?.isFirstLogin
                     ? 'Configuration Google Authenticator'
