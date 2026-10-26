@@ -785,11 +785,14 @@ export default function LiecWorkspacePage() {
                 alt="LIEC Logo"
                 className="h-9 w-9 rounded-xl object-contain shadow-xs bg-white p-0.5 border border-slate-200 dark:border-slate-700 group-hover:opacity-90 transition"
               />
-              <div className="leading-none">
-                <div className="text-[15px] font-extrabold tracking-tight text-[#092342] dark:text-white">
-                  LIEC
+              <div className="leading-tight" title="LIEC Heav'n Workspace">
+                <div className="text-[13px] font-extrabold tracking-tight text-[#092342] dark:text-white">
+                  LIEC Heav’n
                 </div>
-                <div className="text-[10.5px] font-medium text-slate-500 mt-0.5">Education</div>
+                <div className="text-[10px] font-medium text-slate-500 mt-0.5">
+                  Workspace
+                </div>
+                <span className="sr-only">LIEC Heav'n Worskpace</span>
               </div>
             </button>
 

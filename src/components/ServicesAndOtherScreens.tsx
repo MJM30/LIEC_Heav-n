@@ -2444,6 +2444,15 @@ export function ParametresGovernanceScreen({
   const handleSaveCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserName.trim() || !newUserEmail.trim()) return;
+    const cleanEmail = newUserEmail.trim().toLowerCase();
+    if (!cleanEmail.endsWith('@liecconsulting.com')) {
+      showFeedback(
+        isEn
+          ? 'Error: Professional email must end with @liecconsulting.com'
+          : 'Erreur : L’email professionnel doit se terminer par @liecconsulting.com'
+      );
+      return;
+    }
     setLoadingAction(true);
     try {
       const res = await fetch('/api/users', {
@@ -2454,7 +2463,7 @@ export function ParametresGovernanceScreen({
         },
         body: JSON.stringify({
           name: newUserName.trim(),
-          email: newUserEmail.trim(),
+          email: cleanEmail,
           business_profile: newUserProfile,
           technical_roles: newUserRoles,
           title: newUserTitle.trim() || `Collaborateur ${newUserProfile}`,
@@ -3025,16 +3034,26 @@ export function ParametresGovernanceScreen({
 
               <div>
                 <label className="font-bold text-slate-700 block mb-1">
-                  {isEn ? 'Professional Email *' : 'Email professionnel *'}
+                  {isEn ? 'Professional Email *' : 'Email professionnel *'}{' '}
+                  <span className="text-[10.5px] font-semibold text-[#0c685a]">(@liecconsulting.com)</span>
                 </label>
                 <input
                   type="email"
                   required
                   value={newUserEmail}
                   onChange={(e) => setNewUserEmail(e.target.value)}
-                  placeholder={isEn ? 'e.g. j.mbuyi@liec-education.com' : 'ex: j.mbuyi@liec-education.com'}
+                  placeholder={isEn ? 'e.g. j.mbuyi@liecconsulting.com' : 'ex: j.mbuyi@liecconsulting.com'}
+                  pattern="^[a-zA-Z0-9._%+\-]+@liecconsulting\.com$"
+                  title={isEn ? 'Email must end with @liecconsulting.com' : 'L’email doit se terminer par @liecconsulting.com'}
                   className="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0c685a]/20"
                 />
+                {newUserEmail && !newUserEmail.toLowerCase().endsWith('@liecconsulting.com') && (
+                  <p className="mt-1 text-[11px] text-amber-600 font-semibold">
+                    {isEn
+                      ? 'Email must end with @liecconsulting.com'
+                      : 'L’email doit se terminer par @liecconsulting.com'}
+                  </p>
+                )}
               </div>
 
               <div>
