@@ -2460,6 +2460,7 @@ export function ParametresGovernanceScreen({
         headers: {
           'Content-Type': 'application/json',
           'x-user-email': currentUser?.email || 'sarah.mwamba@liec-education.com',
+          'x-user-lang': isEn ? 'en' : 'fr',
         },
         body: JSON.stringify({
           name: newUserName.trim(),
@@ -2483,10 +2484,14 @@ export function ParametresGovernanceScreen({
         );
       } else {
         const err = await res.json();
-        showFeedback(err.error || 'Erreur création');
+        showFeedback(
+          isEn
+            ? (err.error_en || err.message || (err.error?.includes('Refusé') ? 'Access Denied / 403 Forbidden' : err.error) || 'Failed to create user')
+            : (err.error_fr || err.error || 'Erreur lors de la création')
+        );
       }
     } catch {
-      showFeedback('Erreur lors de la création');
+      showFeedback(isEn ? 'Network error during user creation' : 'Erreur lors de la création');
     } finally {
       setLoadingAction(false);
     }

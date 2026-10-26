@@ -106,6 +106,26 @@ export const PRECONFIGURED_USERS_RBAC: Record<string, AuthenticatedUserContext> 
     initials: 'SM',
     active: true,
   },
+  'admin@liecconsulting.com': {
+    id: 1,
+    name: 'Sarah Mwamba',
+    email: 'sarah.mwamba@liec-education.com',
+    business_profile: 'Admin',
+    technical_roles: ['admin', 'lh_security_admin'],
+    title: 'Senior Lyon Advisor & Platform Admin',
+    initials: 'SM',
+    active: true,
+  },
+  'sarah.mwamba@liecconsulting.com': {
+    id: 1,
+    name: 'Sarah Mwamba',
+    email: 'sarah.mwamba@liec-education.com',
+    business_profile: 'Admin',
+    technical_roles: ['admin', 'lh_security_admin'],
+    title: 'Senior Lyon Advisor & Platform Admin',
+    initials: 'SM',
+    active: true,
+  },
   'marc.kouassi@liec-education.com': {
     id: 2,
     name: 'Marc Kouassi',
@@ -160,16 +180,32 @@ export const PRECONFIGURED_USERS_RBAC: Record<string, AuthenticatedUserContext> 
 
 export function canonicalizeUserEmail(rawEmail?: string | null): string {
   const e = (rawEmail || '').trim().toLowerCase();
-  if (e === 'admin@liec-education.com' || e === 'admin@liec.com') {
+  if (
+    e === 'admin@liec-education.com' ||
+    e === 'admin@liec.com' ||
+    e === 'admin@liecconsulting.com' ||
+    e === 'sarah.mwamba@liecconsulting.com' ||
+    e === 'sarah@liecconsulting.com' ||
+    e === 'sarah.mwamba@liec-education.com'
+  ) {
     return 'sarah.mwamba@liec-education.com';
   }
-  if (e === 'secretary@liec-education.com' || e === 'secretaire@liec-education.com') {
+  if (
+    e === 'secretary@liec-education.com' ||
+    e === 'secretaire@liec-education.com' ||
+    e === 'secretary@liecconsulting.com' ||
+    e === 'marc.kouassi@liecconsulting.com' ||
+    e === 'marc.kouassi@liec-education.com'
+  ) {
     return 'marc.kouassi@liec-education.com';
   }
   if (
     e === 'avi@liec-education.com' ||
     e === 'officer.avi@liec-education.com' ||
-    e === 'finance@liec-education.com'
+    e === 'finance@liec-education.com' ||
+    e === 'avi@liecconsulting.com' ||
+    e === 'alain.kanza@liecconsulting.com' ||
+    e === 'alain.kanza@liec-education.com'
   ) {
     return 'alain.kanza@liec-education.com';
   }
@@ -212,10 +248,16 @@ export function evaluateModuleAccess(
   }
 
   const profile = user.business_profile;
+  const userRole = (user as any).role;
   const roles = user.technical_roles || [];
 
   // 1. ADMIN PROFILE (Technical roles: admin, lh_security_admin)
-  if (profile === 'Admin' || roles.includes('admin') || roles.includes('lh_security_admin')) {
+  if (
+    profile === 'Admin' ||
+    userRole === 'admin' ||
+    roles.includes('admin') ||
+    roles.includes('lh_security_admin')
+  ) {
     return { allowed: true, scope: 'full' };
   }
 
@@ -355,12 +397,20 @@ export async function authenticateServerRequest(
 
     if (res.rows.length > 0) {
       const r = res.rows[0];
+      const isRoleAdmin =
+        r.role === 'admin' ||
+        r.business_profile === 'Admin' ||
+        r.email === 'sarah.mwamba@liec-education.com';
       user = {
         id: r.id,
         name: r.name,
         email: r.email,
-        business_profile: r.business_profile as BusinessProfile,
-        technical_roles: r.technical_roles || [],
+        business_profile: (isRoleAdmin ? 'Admin' : r.business_profile) as BusinessProfile,
+        role: isRoleAdmin ? 'admin' : r.role,
+        technical_roles:
+          isRoleAdmin && (!r.technical_roles || r.technical_roles.length === 0)
+            ? ['admin', 'lh_security_admin']
+            : r.technical_roles || [],
         title: r.title,
         initials: r.initials,
         active: Boolean(r.active),
@@ -443,11 +493,18 @@ export async function enforceRbac(
       );
     } catch {}
 
+    const isEn =
+      req.headers.get('x-user-lang') === 'en' ||
+      req.cookies.get('liec_lang')?.value === 'en' ||
+      req.nextUrl.searchParams.get('lang') === 'en';
+
     return {
       allowed: false,
       response: NextResponse.json(
         {
-          error: 'Accès Refusé / 403 Forbidden',
+          error: isEn ? 'Access Denied / 403 Forbidden' : 'Accès Refusé / 403 Forbidden',
+          error_en: 'Access Denied / 403 Forbidden',
+          error_fr: 'Accès Refusé / 403 Forbidden',
           message: evalResult.reason,
           profile: user.business_profile,
           technical_roles: user.technical_roles,

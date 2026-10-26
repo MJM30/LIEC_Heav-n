@@ -22,6 +22,9 @@ export const STAFF_ACCOUNTS: StaffAccount[] = [
       'sarah.mwamba@liec-education.com',
       'admin@liec-education.com',
       'admin@liec.com',
+      'admin@liecconsulting.com',
+      'sarah.mwamba@liecconsulting.com',
+      'sarah@liecconsulting.com',
     ],
   },
   {
@@ -36,6 +39,8 @@ export const STAFF_ACCOUNTS: StaffAccount[] = [
       'marc.kouassi@liec-education.com',
       'secretary@liec-education.com',
       'secretaire@liec-education.com',
+      'secretary@liecconsulting.com',
+      'marc.kouassi@liecconsulting.com',
     ],
   },
   {
@@ -51,6 +56,8 @@ export const STAFF_ACCOUNTS: StaffAccount[] = [
       'avi@liec-education.com',
       'officer.avi@liec-education.com',
       'finance@liec-education.com',
+      'avi@liecconsulting.com',
+      'alain.kanza@liecconsulting.com',
     ],
   },
 ];

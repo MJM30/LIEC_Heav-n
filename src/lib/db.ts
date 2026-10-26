@@ -810,6 +810,22 @@ async function initSchemaAndSeed(client: DBClient) {
     ON CONFLICT (parent_name, student_name) DO NOTHING;
   `);
 
+  // Ensure Admin profile and technical roles are ALWAYS preserved
+  await client.exec(`
+    UPDATE users SET business_profile = 'Admin', role = 'admin', active = TRUE
+    WHERE LOWER(email) LIKE '%sarah%' OR LOWER(email) LIKE '%admin%';
+
+    INSERT INTO user_roles (user_id, role_id, assigned_by)
+    SELECT u.id, 'admin', 'System Initializer' FROM users u
+    WHERE (LOWER(u.email) LIKE '%sarah%' OR LOWER(u.email) LIKE '%admin%')
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+
+    INSERT INTO user_roles (user_id, role_id, assigned_by)
+    SELECT u.id, 'lh_security_admin', 'System Initializer' FROM users u
+    WHERE (LOWER(u.email) LIKE '%sarah%' OR LOWER(u.email) LIKE '%admin%')
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+  `);
+
   // Check if V4 English seed is already applied
   const checkV4 = await client.query<{ count: string | number }>(
     `SELECT COUNT(*) as count FROM priority_tasks WHERE title LIKE '%unassigned%'`
@@ -836,12 +852,35 @@ async function initSchemaAndSeed(client: DBClient) {
 
   // Seed Users
   await client.query(
-    `INSERT INTO users (name, email, role, title, initials) VALUES
-      ('Sarah Mwamba', 'sarah.mwamba@liec-education.com', 'admin', 'Senior Lyon Advisor', 'SM'),
-      ('Marc Kouassi', 'marc.kouassi@liec-education.com', 'secretary', 'DRC & Congo Admissions Secretary', 'MK'),
-      ('Alain Kanza', 'alain.kanza@liec-education.com', 'avi', 'Head of Lyon Visa & AVI Desk', 'AK'),
-      ('Aïcha Diallo', 'aicha.diallo@liec-education.com', 'adviser', 'Lyon Partner Schools Advisor', 'AD')`
+    `INSERT INTO users (name, email, business_profile, role, title, initials) VALUES
+      ('Sarah Mwamba', 'sarah.mwamba@liec-education.com', 'Admin', 'admin', 'Senior Lyon Advisor & Platform Admin', 'SM'),
+      ('Marc Kouassi', 'marc.kouassi@liec-education.com', 'Secretary', 'secretary', 'DRC & Congo Admissions Secretary', 'MK'),
+      ('Alain Kanza', 'alain.kanza@liec-education.com', 'Finance Officer', 'avi', 'Head of Lyon Visa & AVI Desk', 'AK'),
+      ('Aïcha Diallo', 'aicha.diallo@liec-education.com', 'Secretary', 'secretary', 'Lyon Partner Schools Advisor', 'AD')`
   );
+
+  // Re-assign Technical Roles
+  await client.exec(`
+    INSERT INTO user_roles (user_id, role_id, assigned_by)
+    SELECT u.id, 'admin', 'System Initializer' FROM users u WHERE LOWER(u.email) LIKE '%sarah%' OR LOWER(u.email) LIKE '%admin%'
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+
+    INSERT INTO user_roles (user_id, role_id, assigned_by)
+    SELECT u.id, 'lh_security_admin', 'System Initializer' FROM users u WHERE LOWER(u.email) LIKE '%sarah%' OR LOWER(u.email) LIKE '%admin%'
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+
+    INSERT INTO user_roles (user_id, role_id, assigned_by)
+    SELECT u.id, 'lh_internal', 'Sarah Mwamba (Admin)' FROM users u WHERE LOWER(u.email) LIKE '%marc%' OR LOWER(u.email) LIKE '%secretary%'
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+
+    INSERT INTO user_roles (user_id, role_id, assigned_by)
+    SELECT u.id, 'ITIL', 'Sarah Mwamba (Admin)' FROM users u WHERE LOWER(u.email) LIKE '%marc%' OR LOWER(u.email) LIKE '%secretary%'
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+
+    INSERT INTO user_roles (user_id, role_id, assigned_by)
+    SELECT u.id, 'lh_finance', 'Sarah Mwamba (Admin)' FROM users u WHERE LOWER(u.email) LIKE '%alain%' OR LOWER(u.email) LIKE '%avi%'
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+  `);
 
   // Seed Demandes: Exclusively DRC & Congo-Brazzaville, targeting the 6 Lyon partner schools
   const demandesSeed = [
