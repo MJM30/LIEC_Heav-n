@@ -25,6 +25,15 @@ export async function POST(req: NextRequest) {
     const email = (body.email || 'contact@exemple.com').trim();
     const phone = (body.phone || '+243 81 000 0000').trim();
 
+    // 0. Candidate Phone Number (max 14 digits)
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length > 14) {
+      return NextResponse.json(
+        { error: 'Phone / WhatsApp must be limited to a maximum of 14 digits.' },
+        { status: 400 }
+      );
+    }
+
     // 1. Parent Full Name
     const parentFullName = (body.parent_full_name || body.parent_name || '').trim();
 

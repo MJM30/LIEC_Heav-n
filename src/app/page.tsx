@@ -388,6 +388,17 @@ export default function LiecWorkspacePage() {
     e.preventDefault();
     if (!newDemName.trim()) return;
 
+    // Validate Candidate Phone / WhatsApp (max 14 digits)
+    const candPhoneDigits = newDemPhone.replace(/\D/g, '');
+    if (candPhoneDigits.length > 14) {
+      showToast(
+        isEn
+          ? 'Phone / WhatsApp must be limited to a maximum of 14 digits.'
+          : 'Le numéro de téléphone / WhatsApp ne peut pas dépasser 14 chiffres.'
+      );
+      return;
+    }
+
     // Validate Parent Phone (max 14 digits)
     const phoneDigits = newDemParentPhone.replace(/\D/g, '');
     if (phoneDigits.length > 14) {
@@ -438,6 +449,7 @@ export default function LiecWorkspacePage() {
     if (createdRef) {
       setNewDemName('');
       setNewDemEmail('');
+      setNewDemPhone(newDemCountry === 'RDC' ? '+243 ' : '+242 ');
       setNewDemParentName('');
       setNewDemParentPhone('');
       setNewDemGraduationYear('2024');
@@ -1373,14 +1385,23 @@ export default function LiecWorkspacePage() {
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">
-                      {isEn ? 'Phone / WhatsApp *' : 'Téléphone / WhatsApp *'}
+                    <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>{isEn ? 'Phone / WhatsApp *' : 'Téléphone / WhatsApp *'}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        {newDemPhone.replace(/\D/g, '').length}/14 {isEn ? 'digits max' : 'chiffres max'}
+                      </span>
                     </label>
                     <input
                       type="tel"
                       required
                       value={newDemPhone}
-                      onChange={(e) => setNewDemPhone(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val.replace(/\D/g, '').length <= 14) {
+                          setNewDemPhone(val);
+                        }
+                      }}
+                      maxLength={18}
                       className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5"
                     />
                   </div>

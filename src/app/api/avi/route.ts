@@ -70,6 +70,15 @@ export async function POST(req: NextRequest) {
     const parentName = (body.parent_name || 'Parent Responsable').trim();
     const studentName = (body.student_name || 'Étudiant LIEC').trim();
     const parentPhone = (body.phone || '+243 81 000 0000').trim();
+
+    // Validate Parent Phone / WhatsApp (max 14 digits)
+    const parentPhoneDigits = parentPhone.replace(/\D/g, '');
+    if (parentPhoneDigits.length > 14) {
+      return NextResponse.json(
+        { error: 'Parent Phone / WhatsApp must be limited to a maximum of 14 digits.' },
+        { status: 400 }
+      );
+    }
     const studentProgram = (body.student_program || 'Programme Lyon').trim();
 
     await db.query(

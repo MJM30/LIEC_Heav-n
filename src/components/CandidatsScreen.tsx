@@ -935,7 +935,12 @@ export default function CandidatsScreen({
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">{isEn ? 'Parent Phone (max 14)' : 'Tél. parent (max 14)'}</label>
+                  <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>{isEn ? 'Parent Phone Number' : 'Téléphone du parent'}</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      {newCandParentPhone.replace(/\D/g, '').length}/14 {isEn ? 'digits max' : 'chiffres max'}
+                    </span>
+                  </label>
                   <input
                     type="tel"
                     value={newCandParentPhone}

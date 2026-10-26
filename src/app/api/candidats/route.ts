@@ -12,6 +12,15 @@ export async function POST(req: NextRequest) {
     const adviser = (body.adviser || 'Sarah Mwamba').trim();
     const email = (body.email || 'candidat@liec.edu').trim();
     const phone = (body.phone || '+243 81 000 0000').trim();
+
+    // Validate Candidate Phone Number (max 14 digits)
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length > 14) {
+      return NextResponse.json(
+        { error: 'Phone / WhatsApp must be limited to a maximum of 14 digits.' },
+        { status: 400 }
+      );
+    }
     const country = (body.country || 'RDC (Kinshasa)').trim();
 
     const countRes = await db.query<{ count: string | number }>('SELECT COUNT(*) as count FROM candidats');
@@ -25,6 +34,15 @@ export async function POST(req: NextRequest) {
     }
     const parentFullName = (body.parent_full_name || body.parent_name || '').trim();
     const parentPhone = (body.parent_phone || '').trim();
+
+    // Validate Parent Phone Number (max 14 digits)
+    const parentPhoneDigits = parentPhone.replace(/\D/g, '');
+    if (parentPhoneDigits.length > 14) {
+      return NextResponse.json(
+        { error: 'Parent Phone Number must be limited to a maximum of 14 digits.' },
+        { status: 400 }
+      );
+    }
     const graduationYear = String(body.graduation_year || '').trim();
     const currentActivity = (body.current_activity || '').trim();
     const finalYearUniversity = (body.final_year_university || '').trim();
