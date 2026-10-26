@@ -32,6 +32,7 @@ interface OverviewScreenProps {
   onResetTasks: () => void;
   onNotify: (msg: string) => void;
   lang?: Lang;
+  userRole?: 'admin' | 'secretary' | 'avi';
 }
 
 export default function OverviewScreen({
@@ -44,6 +45,7 @@ export default function OverviewScreen({
   onResetTasks,
   onNotify,
   lang = 'en',
+  userRole = 'admin',
 }: OverviewScreenProps) {
   const isEn = lang === 'en';
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('month');
@@ -118,13 +120,16 @@ export default function OverviewScreen({
             </span>
           </div>
 
-          <button
-            onClick={onOpenNewDemande}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0c6358] hover:bg-[#094f46] text-white font-semibold text-xs px-5 py-2.5 shadow-sm transition"
-          >
-            <Plus className="w-4 h-4" />
-            New Application
-          </button>
+          {/* "+ New Application" button: Visible ONLY to admin and secretary roles (hidden for Officer AVI) */}
+          {(userRole === 'admin' || userRole === 'secretary') && (
+            <button
+              onClick={onOpenNewDemande}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0c6358] hover:bg-[#094f46] text-white font-semibold text-xs px-5 py-2.5 shadow-sm transition"
+            >
+              <Plus className="w-4 h-4" />
+              {isEn ? 'New Application' : 'Nouvelle Demande'}
+            </button>
+          )}
         </div>
       </div>
 

@@ -954,12 +954,16 @@ export default function LiecWorkspacePage() {
                   demandes={demandes}
                   priorityTasks={priorityTasks}
                   onNavigate={(tab) => setActiveTab(tab as NavTab)}
-                  onOpenNewDemande={() => setShowNewDemandeModal(true)}
+                  onOpenNewDemande={() => {
+                    if (rolePreview === 'avi') return;
+                    setShowNewDemandeModal(true);
+                  }}
                   onSelectDemande={(ref) => setSelectedDemandeRef(ref)}
                   onToggleTask={handleToggleTask}
                   onResetTasks={handleResetTasks}
                   onNotify={showToast}
                   lang={lang}
+                  userRole={rolePreview}
                 />
               )}
 
@@ -1165,8 +1169,8 @@ export default function LiecWorkspacePage() {
         </main>
       </div>
 
-      {/* Modal: New Application */}
-      {showNewDemandeModal && (
+      {/* Modal: New Application - Accessible only by Admin & Secretary */}
+      {showNewDemandeModal && (rolePreview === 'admin' || rolePreview === 'secretary') && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-elevated border border-slate-100 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
