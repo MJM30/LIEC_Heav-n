@@ -636,7 +636,7 @@ export default function LiecWorkspacePage() {
             className="h-12 w-12 rounded-2xl object-contain shadow-md bg-white p-1 border border-slate-200"
           />
           <div className="text-left">
-            <div className="text-xl font-extrabold tracking-tight text-[#092342]">LIEC One</div>
+            <div className="text-xl font-extrabold tracking-tight text-[#092342]">LIEC Heav’n</div>
             <div className="text-xs font-semibold text-slate-500">Education Management Workspace</div>
           </div>
         </div>
@@ -1182,7 +1182,7 @@ export default function LiecWorkspacePage() {
               {activeTab === 'aide' && (
                 <div className="space-y-4">
                   <h1 className="text-[28px] font-extrabold text-[#092342]">
-                    {isEn ? 'Help, Support & LIEC One Knowledge Base' : 'Aide, Support & Documentation LIEC One'}
+                    {isEn ? 'Help, Support & LIEC Heav’n Knowledge Base' : 'Aide, Support & Documentation LIEC Heav’n'}
                   </h1>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="rounded-2xl border border-[#e6eef6] bg-white p-6 shadow-card space-y-2">

@@ -207,6 +207,16 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS staff_2fa (
+  id SERIAL PRIMARY KEY,
+  user_email VARCHAR(160) UNIQUE NOT NULL,
+  secret VARCHAR(80) NOT NULL,
+  is_activated BOOLEAN NOT NULL DEFAULT FALSE,
+  activated_at TIMESTAMP WITH TIME ZONE,
+  last_verified_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Seed Technical Roles
 INSERT INTO roles (role_id, role_name, business_profile, description, safeguards, active) VALUES
   ('admin', 'Platform Administrator', 'Admin', 'Highest privilege. Assign only to trusted administrators.', 'Assign only to trusted administrators; log assignments and removals.', TRUE),

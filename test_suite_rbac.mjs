@@ -4,7 +4,7 @@ async function runTests() {
   const aviEmail = 'alain.kanza@liec-education.com';
 
   console.log('================================================================');
-  console.log('LIEC-ONE RBAC VERIFICATION SUITE (PDF SPECIFICATION COMPLIANCE)');
+  console.log('LIEC HEAV’N RBAC VERIFICATION SUITE (PDF SPECIFICATION COMPLIANCE)');
   console.log('================================================================\n');
 
   // TEST 1: Technical Roles Registry

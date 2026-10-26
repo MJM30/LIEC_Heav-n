@@ -1894,8 +1894,8 @@ export function PublicSiteIntakeScreen({
         <div className="lg:col-span-5 rounded-2xl border border-[#e6eef6] bg-white p-6 shadow-card space-y-4">
           <h2 className="text-base font-extrabold text-[#092342]">
             {isEn
-              ? 'Automated Processing Workflow (Public Site → LIEC One)'
-              : 'Flux de traitement automatisé (Site Public → LIEC One)'}
+              ? 'Automated Processing Workflow (Public Site → LIEC Heav’n)'
+              : 'Flux de traitement automatisé (Site Public → LIEC Heav’n)'}
           </h2>
           <div className="space-y-3">
             {[
@@ -1971,8 +1971,8 @@ export function RapportsFinanceScreen({
         </h2>
         <p className="text-xs text-slate-600 max-w-md mx-auto">
           {isEn
-            ? 'In accordance with the LIEC One security matrix, sensitive financial totals and billing are not exposed to the Secretary profile. Switch to Admin or AVI Officer role in the top header.'
-            : 'Conformément à la matrice de sécurité LIEC One, les totaux financiers sensibles et la facturation ne sont pas exposés au profil Secrétaire.'}
+            ? 'In accordance with the LIEC Heav’n security matrix, sensitive financial totals and billing are not exposed to the Secretary profile. Switch to Admin or AVI Officer role in the top header.'
+            : 'Conformément à la matrice de sécurité LIEC Heav’n, les totaux financiers sensibles et la facturation ne sont pas exposés au profil Secrétaire.'}
         </p>
       </div>
     );

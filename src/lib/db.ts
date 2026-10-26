@@ -541,6 +541,16 @@ async function initSchemaAndSeed(client: DBClient) {
       UNIQUE(user_id, role_id)
     );
 
+    CREATE TABLE IF NOT EXISTS staff_2fa (
+      id SERIAL PRIMARY KEY,
+      user_email VARCHAR(160) UNIQUE NOT NULL,
+      secret VARCHAR(80) NOT NULL,
+      is_activated BOOLEAN NOT NULL DEFAULT FALSE,
+      activated_at TIMESTAMP WITH TIME ZONE,
+      last_verified_at TIMESTAMP WITH TIME ZONE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
     ALTER TABLE users ADD COLUMN IF NOT EXISTS business_profile VARCHAR(50) DEFAULT 'Secretary';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP WITH TIME ZONE;

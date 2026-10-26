@@ -12,7 +12,7 @@ async function main() {
   const db = new PGlite(dataDir);
   await db.waitReady;
   await db.exec(schemaSql);
-  console.log('✓ Schéma PostgreSQL LIEC-One initialisé avec succès dans', dataDir);
+  console.log('✓ Schéma PostgreSQL LIEC Heav’n initialisé avec succès dans', dataDir);
 }
 
 main().catch((err) => {

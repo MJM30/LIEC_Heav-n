@@ -1,63 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { canonicalizeUserEmail } from '@/lib/rbac';
-
-export interface StaffAccount {
-  id: number;
-  name: string;
-  email: string;
-  role: 'admin' | 'secretary' | 'avi';
-  title: string;
-  initials: string;
-  password: string;
-  acceptedEmails: string[];
-}
-
-export const STAFF_ACCOUNTS: StaffAccount[] = [
-  {
-    id: 1,
-    name: 'Sarah Mwamba',
-    email: 'sarah.mwamba@liec-education.com',
-    role: 'admin',
-    title: 'Senior Lyon Advisor & Platform Admin',
-    initials: 'SM',
-    password: 'Admin@LIEC2026!',
-    acceptedEmails: [
-      'sarah.mwamba@liec-education.com',
-      'admin@liec-education.com',
-      'admin@liec.com',
-    ],
-  },
-  {
-    id: 2,
-    name: 'Marc Kouassi',
-    email: 'marc.kouassi@liec-education.com',
-    role: 'secretary',
-    title: 'DRC Admissions Secretary',
-    initials: 'MK',
-    password: 'Secretary@LIEC2026!',
-    acceptedEmails: [
-      'marc.kouassi@liec-education.com',
-      'secretary@liec-education.com',
-      'secretaire@liec-education.com',
-    ],
-  },
-  {
-    id: 3,
-    name: 'Alain Kanza',
-    email: 'alain.kanza@liec-education.com',
-    role: 'avi',
-    title: 'Officier Financement AVI',
-    initials: 'AK',
-    password: 'AviOfficer@LIEC2026!',
-    acceptedEmails: [
-      'alain.kanza@liec-education.com',
-      'avi@liec-education.com',
-      'officer.avi@liec-education.com',
-      'finance@liec-education.com',
-    ],
-  },
-];
+import { getOrCreateStaff2Fa } from '@/lib/authStore';
+import { getTotpSetup } from '@/lib/totp';
+import { STAFF_ACCOUNTS } from '@/lib/staff';
 
 export async function POST(req: NextRequest) {
   try {
@@ -82,7 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'Adresse e-mail non reconnue. Seul le personnel autorisé LIEC peut accéder au workspace.',
+            'Adresse e-mail non reconnue. Seul le personnel autorisé de LIEC Heav’n peut accéder au workspace.',
         },
         { status: 401 }
       );
@@ -104,30 +50,41 @@ export async function POST(req: NextRequest) {
       initials: matchedAccount.initials,
     };
 
+    // Retrieve or initialize Two-Factor Authentication state
+    const twoFaRecord = await getOrCreateStaff2Fa(matchedAccount.email);
+
     try {
       const db = await getDb();
       await db.query(
         `INSERT INTO audit_logs (actor, action, entity_ref, outcome)
-         VALUES ($1, 'Connexion espace sécurisé LIEC One (' || $2 || ')', 'AUTH-SESSION', 'Succès')`,
+         VALUES ($1, 'Mot de passe validé - En attente 2FA Google Authenticator (' || $2 || ')', 'AUTH-PASSWORD-CHECK', 'Succès')`,
         [matchedAccount.name, matchedAccount.role]
       );
     } catch (dbErr) {
       console.warn('Database audit logging skipped:', dbErr);
     }
 
-    const res = NextResponse.json({
-      authenticated: true,
+    if (!twoFaRecord.isActivated) {
+      // First login: Generate QR code and require activation verification
+      const setup = getTotpSetup(matchedAccount.email, twoFaRecord.secret);
+      return NextResponse.json({
+        requires2Fa: true,
+        isFirstLogin: true,
+        email: matchedAccount.email,
+        secret: twoFaRecord.secret,
+        uri: setup.uri,
+        qrSvg: setup.qrSvg,
+        user: userPayload,
+      });
+    }
+
+    // Subsequent login: Require 6-digit TOTP code
+    return NextResponse.json({
+      requires2Fa: true,
+      isFirstLogin: false,
+      email: matchedAccount.email,
       user: userPayload,
     });
-
-    res.cookies.set('liec_user_email', matchedAccount.email, {
-      path: '/',
-      httpOnly: false,
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
-    });
-
-    return res;
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || 'Erreur interne du serveur auth.' },
