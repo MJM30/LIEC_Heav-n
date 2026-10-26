@@ -221,7 +221,7 @@ export default function LoginPage() {
           position: absolute;
           inset: 0;
           pointer-events: none;
-          z-index: 0;
+          z-index: 1;
           overflow: hidden;
           display: flex;
           align-items: center;
@@ -234,43 +234,63 @@ export default function LoginPage() {
           will-change: transform;
         }
         .animated-bg-logo {
-          width: min(720px, 75vw);
-          height: min(720px, 75vw);
+          width: min(580px, 88vw);
+          height: min(580px, 88vw);
           object-fit: contain;
-          opacity: 0.045;
-          filter: grayscale(15%) drop-shadow(0 0 45px rgba(0, 191, 243, 0.28));
-          animation: subtleLogoFloat 14s ease-in-out infinite alternate;
+          mix-blend-mode: multiply;
+          opacity: 0.24;
+          filter: drop-shadow(0 20px 45px rgba(0, 191, 243, 0.38));
+          animation: subtleLogoFloat 11s ease-in-out infinite alternate;
           transform-origin: center center;
           pointer-events: none;
           user-select: none;
         }
         .animated-bg-aura {
           position: absolute;
-          width: min(880px, 92vw);
-          height: min(880px, 92vw);
+          width: min(740px, 95vw);
+          height: min(740px, 95vw);
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(0, 191, 243, 0.09) 0%, rgba(0, 210, 189, 0.05) 45%, transparent 70%);
-          animation: subtleAuraPulse 10s ease-in-out infinite alternate;
+          background: radial-gradient(circle, rgba(0, 191, 243, 0.22) 0%, rgba(0, 210, 189, 0.14) 45%, transparent 70%);
+          animation: subtleAuraPulse 9s ease-in-out infinite alternate;
           pointer-events: none;
           will-change: transform;
         }
         @keyframes subtleLogoFloat {
           0% {
-            transform: translateY(0px) scale(0.98) rotate(0deg);
-            opacity: 0.04;
+            transform: translateY(0px) scale(0.97) rotate(0deg);
+            opacity: 0.20;
           }
           50% {
-            transform: translateY(-16px) scale(1.03) rotate(0.8deg);
-            opacity: 0.075;
+            transform: translateY(-20px) scale(1.04) rotate(1.2deg);
+            opacity: 0.28;
           }
           100% {
-            transform: translateY(6px) scale(1.01) rotate(-0.5deg);
-            opacity: 0.05;
+            transform: translateY(8px) scale(1.01) rotate(-0.8deg);
+            opacity: 0.22;
           }
         }
         @keyframes subtleAuraPulse {
-          0% { transform: scale(0.95); opacity: 0.35; }
-          100% { transform: scale(1.08); opacity: 0.65; }
+          0% { transform: scale(0.94); opacity: 0.55; }
+          100% { transform: scale(1.10); opacity: 0.90; }
+        }
+
+        .left-bg-logo {
+          position: absolute;
+          right: -60px;
+          bottom: -30px;
+          width: 400px;
+          height: 400px;
+          mix-blend-mode: multiply;
+          opacity: 0.14;
+          pointer-events: none;
+          user-select: none;
+          z-index: 0;
+          animation: subtleLogoFloat 13s ease-in-out infinite alternate;
+        }
+        .left-bg-logo img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
         }
 
         .left {
@@ -394,15 +414,18 @@ export default function LoginPage() {
           padding: 36px 28px;
           background: linear-gradient(145deg, #eafaff, #f7fffd 65%, #f5ffe9);
           position: relative;
+          overflow: hidden;
           z-index: 1;
         }
         .login-card {
           width: min(94%, 540px);
-          background: white;
-          border: 1px solid #e4edf2;
+          background: rgba(255, 255, 255, 0.88);
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
+          border: 1px solid rgba(255, 255, 255, 0.95);
           border-radius: 22px;
           padding: 40px;
-          box-shadow: 0 24px 70px rgba(20, 65, 90, 0.10);
+          box-shadow: 0 24px 70px rgba(20, 65, 90, 0.12), 0 0 1px rgba(0, 0, 0, 0.05);
           position: relative;
           z-index: 2;
         }
@@ -614,32 +637,19 @@ export default function LoginPage() {
       `}} />
 
       <div className="login-body-wrapper" onMouseMove={handleMouseMove}>
-        {/* Subtle, professional ambient animation of official LIEC logo in background, interactive with mouse cursor */}
-        <div className="animated-bg-logo-wrap" aria-hidden="true">
-          <div
-            className="animated-bg-aura"
-            style={{
-              transform: `translate3d(${mousePos.x * -22}px, ${mousePos.y * -22}px, 0) scale(${1 + Math.abs(mousePos.x * 0.04)})`,
-              transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          />
-          <div
-            className="animated-bg-logo-mover"
-            style={{
-              transform: `translate3d(${mousePos.x * 30}px, ${mousePos.y * 30}px, 0) rotate(${mousePos.x * 4}deg)`,
-              transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          >
-            <img
-              src="/logo_LIEC.jpeg"
-              alt=""
-              className="animated-bg-logo"
-            />
-          </div>
-        </div>
-
         {/* Left Branding Column */}
         <section className="left">
+          <div
+            className="left-bg-logo"
+            aria-hidden="true"
+            style={{
+              transform: `translate3d(${mousePos.x * -18}px, ${mousePos.y * -18}px, 0)`,
+              transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            <img src="/logo_LIEC.jpeg" alt="" />
+          </div>
+
           <Link href="/" className="brand" aria-label="LIEC Heav’n home">
             <img className="logo" src="/logo_LIEC.jpeg" alt="LIEC logo" />
             <div>
@@ -686,6 +696,30 @@ export default function LoginPage() {
 
         {/* Right Authentication Form Column */}
         <section className="right">
+          {/* Animated official LIEC logo watermark in background, interactive with mouse cursor */}
+          <div className="animated-bg-logo-wrap" aria-hidden="true">
+            <div
+              className="animated-bg-aura"
+              style={{
+                transform: `translate3d(${mousePos.x * -26}px, ${mousePos.y * -26}px, 0) scale(${1 + Math.abs(mousePos.x * 0.05)})`,
+                transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            />
+            <div
+              className="animated-bg-logo-mover"
+              style={{
+                transform: `translate3d(${mousePos.x * 32}px, ${mousePos.y * 32}px, 0) rotate(${mousePos.x * 4.5}deg)`,
+                transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            >
+              <img
+                src="/logo_LIEC.jpeg"
+                alt=""
+                className="animated-bg-logo"
+              />
+            </div>
+          </div>
+
           <div className="login-card">
             <Link href="/" className="brand mobile-brand" aria-label="LIEC Heav’n home">
               <img className="logo" src="/logo_LIEC.jpeg" alt="LIEC logo" />
