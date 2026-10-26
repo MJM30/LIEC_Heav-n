@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { Pool } from 'pg';
 import { PGlite } from '@electric-sql/pglite';
 
@@ -516,8 +517,177 @@ const SEED_CANDIDATS = [
 
 async function initSchemaAndSeed(client: DBClient) {
   const schemaPath = path.join(process.cwd(), 'database', 'schema.sql');
-  const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
-  await client.exec(schemaSql);
+  if (fs.existsSync(schemaPath)) {
+    try {
+      const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
+      await client.exec(schemaSql);
+    } catch (e) {
+      console.warn('Notice: Could not execute database/schema.sql file:', e);
+    }
+  }
+
+  // Ensure all base tables exist (vital for serverless deployments like Vercel/Lambda)
+  await client.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(120) NOT NULL,
+      email VARCHAR(160) UNIQUE NOT NULL,
+      business_profile VARCHAR(50) NOT NULL DEFAULT 'Secretary',
+      role VARCHAR(50) NOT NULL DEFAULT 'secretary',
+      title VARCHAR(100) NOT NULL DEFAULT 'Conseillère Senior',
+      initials VARCHAR(10) NOT NULL DEFAULT 'SM',
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS demandes (
+      id SERIAL PRIMARY KEY,
+      ref VARCHAR(50) UNIQUE NOT NULL,
+      initials VARCHAR(10) NOT NULL,
+      full_name VARCHAR(150) NOT NULL,
+      email VARCHAR(160) NOT NULL,
+      phone VARCHAR(60) NOT NULL,
+      parent_full_name VARCHAR(150),
+      parent_phone VARCHAR(30),
+      graduation_year VARCHAR(10),
+      current_activity VARCHAR(25),
+      final_year_university VARCHAR(10),
+      whatsapp_verified BOOLEAN DEFAULT TRUE,
+      country_code VARCHAR(10) DEFAULT 'CD',
+      flag VARCHAR(10) DEFAULT '🇨🇩',
+      country_name VARCHAR(100) DEFAULT 'RDC',
+      city VARCHAR(120) DEFAULT 'Kinshasa',
+      nationality VARCHAR(100) DEFAULT 'Congolaise (RDC)',
+      program VARCHAR(180) NOT NULL,
+      service_pole VARCHAR(120) NOT NULL,
+      target_cities VARCHAR(150) DEFAULT 'Lyon',
+      current_level VARCHAR(100) DEFAULT 'Licence',
+      budget_range VARCHAR(100) DEFAULT '8 500 € – 10 000 € / an',
+      status VARCHAR(60) DEFAULT 'Nouvelle',
+      adviser VARCHAR(100) DEFAULT 'Sarah Mwamba',
+      expected_start VARCHAR(60) DEFAULT 'Septembre 2025',
+      message TEXT,
+      submitted_at VARCHAR(60) DEFAULT 'Just now',
+      is_dashboard_recent BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS demande_notes (
+      id SERIAL PRIMARY KEY,
+      demande_ref VARCHAR(50) NOT NULL,
+      author VARCHAR(100) NOT NULL,
+      timestamp_label VARCHAR(60) DEFAULT 'Today',
+      content TEXT NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS prospects (
+      id SERIAL PRIMARY KEY,
+      ref VARCHAR(50) UNIQUE NOT NULL,
+      full_name VARCHAR(150) NOT NULL,
+      initials VARCHAR(10) NOT NULL,
+      program VARCHAR(180) NOT NULL,
+      stage VARCHAR(50) NOT NULL DEFAULT 'lead',
+      email VARCHAR(160),
+      phone VARCHAR(60),
+      country VARCHAR(100) DEFAULT 'RDC',
+      city VARCHAR(100) DEFAULT 'Kinshasa',
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS candidats (
+      id SERIAL PRIMARY KEY,
+      ref VARCHAR(50) UNIQUE NOT NULL,
+      initials VARCHAR(10) NOT NULL,
+      full_name VARCHAR(160) NOT NULL,
+      avatar_url VARCHAR(255),
+      program VARCHAR(180) NOT NULL,
+      cities VARCHAR(140) NOT NULL,
+      adviser VARCHAR(120) NOT NULL DEFAULT 'Sarah Mwamba',
+      stage_badge VARCHAR(60) NOT NULL DEFAULT 'Jalon 1',
+      stage_badge_tone VARCHAR(30) NOT NULL DEFAULT 'teal',
+      progress_pct INTEGER NOT NULL DEFAULT 25,
+      status_left VARCHAR(80) NOT NULL DEFAULT 'Dossier à 25%',
+      status_right VARCHAR(80) NOT NULL DEFAULT 'J-30 CF',
+      email VARCHAR(160) DEFAULT 'candidat@liec.edu',
+      phone VARCHAR(60) DEFAULT '+243 81 000 0000',
+      parent_full_name VARCHAR(150),
+      parent_phone VARCHAR(30),
+      graduation_year VARCHAR(10),
+      current_activity VARCHAR(25),
+      final_year_university VARCHAR(10),
+      country VARCHAR(100) DEFAULT 'RDC (Kinshasa)',
+      nationality VARCHAR(100) DEFAULT 'Congolaise (RDC)',
+      current_diploma VARCHAR(180) DEFAULT 'Licence',
+      tcf_score VARCHAR(100) DEFAULT 'TCF B2',
+      garant_info VARCHAR(220) DEFAULT 'Dossier AVI',
+      interview_date VARCHAR(100) DEFAULT '15 Novembre 2025',
+      jalons_json TEXT DEFAULT '[]',
+      voeux_json TEXT DEFAULT '[]',
+      notes_json TEXT DEFAULT '[]',
+      pieces_json TEXT DEFAULT '[]',
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS priority_tasks (
+      id SERIAL PRIMARY KEY,
+      title VARCHAR(160) NOT NULL,
+      description TEXT NOT NULL,
+      priority VARCHAR(40) NOT NULL DEFAULT 'Moderate',
+      action_label VARCHAR(80) NOT NULL DEFAULT 'Open',
+      target_module VARCHAR(60) NOT NULL DEFAULT 'demandes',
+      completed BOOLEAN NOT NULL DEFAULT FALSE,
+      role_queue VARCHAR(50) NOT NULL DEFAULT 'adviser',
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS avi_requests (
+      id SERIAL PRIMARY KEY,
+      ref VARCHAR(50) UNIQUE NOT NULL,
+      parent_name VARCHAR(150) NOT NULL,
+      student_name VARCHAR(150) NOT NULL,
+      country VARCHAR(80) NOT NULL,
+      amount NUMERIC(12,2) NOT NULL,
+      status VARCHAR(60) NOT NULL DEFAULT 'pending',
+      physical_address VARCHAR(220) DEFAULT 'Avenue de la Gombe, Kinshasa',
+      other_guarantor BOOLEAN NOT NULL DEFAULT FALSE,
+      guarantor_details TEXT DEFAULT '',
+      principal_eur NUMERIC(12,2) NOT NULL DEFAULT 2800.00,
+      principal_xaf NUMERIC(14,2) NOT NULL DEFAULT 1836680.00,
+      total_interest_eur NUMERIC(10,2) NOT NULL DEFAULT 336.00,
+      supporting_docs TEXT DEFAULT '',
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS prepa_cohorts (
+      id SERIAL PRIMARY KEY,
+      code VARCHAR(50) UNIQUE NOT NULL,
+      title VARCHAR(150) NOT NULL,
+      student_count INTEGER NOT NULL DEFAULT 0,
+      target_school VARCHAR(150) NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'active',
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS invoices (
+      id SERIAL PRIMARY KEY,
+      ref VARCHAR(50) UNIQUE NOT NULL,
+      client_name VARCHAR(150) NOT NULL,
+      amount NUMERIC(12,2) NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'unpaid',
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id SERIAL PRIMARY KEY,
+      actor VARCHAR(150) NOT NULL,
+      action VARCHAR(255) NOT NULL,
+      entity_ref VARCHAR(100),
+      outcome VARCHAR(50) NOT NULL DEFAULT 'Succès',
+      details TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 
   // Ensure RBAC schema columns and tables exist
   await client.exec(`
@@ -1284,10 +1454,39 @@ async function createDBClient(): Promise<DBClient> {
     }
   }
 
-  const dataDir = path.join(process.cwd(), 'database', '.pgdata');
-  fs.mkdirSync(dataDir, { recursive: true });
-  const pglite = new PGlite(dataDir);
-  await pglite.waitReady;
+  // Resolve dataDir with full support for Serverless environments (AWS Lambda, Vercel, read-only /var/task)
+  let pglite: any;
+  const isServerless =
+    Boolean(process.env.VERCEL) ||
+    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+    Boolean(process.env.LAMBDA_TASK_ROOT) ||
+    process.cwd().startsWith('/var/task');
+
+  const candidateDirs = isServerless
+    ? [path.join(os.tmpdir(), '.pgdata'), '/tmp/.pgdata']
+    : [
+        path.join(process.cwd(), 'database', '.pgdata'),
+        path.join(os.tmpdir(), '.pgdata'),
+        '/tmp/.pgdata',
+      ];
+
+  for (const dir of candidateDirs) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      pglite = new PGlite(dir);
+      await pglite.waitReady;
+      break;
+    } catch (e) {
+      console.warn(`Could not initialize PGlite at "${dir}":`, e);
+    }
+  }
+
+  // Fallback to in-memory PGlite if all filesystem attempts fail
+  if (!pglite) {
+    console.warn('Falling back to in-memory PGlite instance.');
+    pglite = new PGlite();
+    await pglite.waitReady;
+  }
 
   const pgliteClient: DBClient = {
     engine: 'pglite',
