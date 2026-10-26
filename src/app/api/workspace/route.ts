@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
       auditRes,
       usersRes,
       rolesRes,
+      parentLinksRes,
     ] = await Promise.all([
       db.query('SELECT * FROM demandes ORDER BY id ASC'),
       db.query('SELECT * FROM demande_notes ORDER BY id ASC'),
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest) {
       db.query('SELECT * FROM audit_logs ORDER BY id DESC LIMIT 50'),
       db.query('SELECT id, name, email, business_profile, role, title, initials, active, suspended_at, suspended_by, created_at FROM users ORDER BY id ASC'),
       db.query('SELECT * FROM roles ORDER BY id ASC'),
+      db.query('SELECT * FROM parent_student_links ORDER BY parent_name ASC, student_name ASC'),
     ]);
 
     // Parse JSON fields on candidats
@@ -65,10 +67,10 @@ export async function GET(req: NextRequest) {
     let filteredRoles = rolesRes.rows;
     let filteredTasks = tasksRes.rows;
     let filteredPrepaCohorts = prepaRes.rows;
+    let filteredParentLinks = parentLinksRes.rows;
 
     if (profile === 'Secretary') {
-      // Secretary: Denied by default from General Finance & Blocked Finance (AVI)
-      filteredAviRequests = [];
+      // Secretary: Denied by default from General Finance & Audit
       filteredInvoices = [];
       filteredAuditLogs = [];
       filteredUsers = [];
@@ -113,6 +115,7 @@ export async function GET(req: NextRequest) {
       auditLogs: filteredAuditLogs,
       users: filteredUsers,
       roles: filteredRoles,
+      parentStudentLinks: filteredParentLinks,
     });
   } catch (error: any) {
     console.error('Error in workspace RBAC query:', error);

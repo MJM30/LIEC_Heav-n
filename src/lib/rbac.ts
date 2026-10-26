@@ -257,14 +257,14 @@ export function evaluateModuleAccess(
       case 'candidats':
       case 'prepa':
       case 'reports':
-        return { allowed: true, scope: 'intake_administrative' };
       case 'avi':
+        return { allowed: true, scope: 'intake_administrative' };
       case 'yimmiline':
       case 'finance':
         return {
           allowed: false,
           scope: 'denied',
-          reason: 'Access denied: Secretary is denied from Blocked Finance (AVI), YIMMILINE and General Finance operations.',
+          reason: 'Access denied: Secretary is denied from General Finance operations.',
         };
       case 'users_roles_config':
       case 'audit':

@@ -61,31 +61,35 @@ export async function POST(req: NextRequest) {
       Number(body.total_interest_eur) || principalEur * (offerMeta.rate / 100);
     const liecRetainedEur = 150.0;
 
+    const parentName = (body.parent_name || 'Parent Responsable').trim();
+    const studentName = (body.student_name || 'Étudiant LIEC').trim();
+    const parentPhone = (body.phone || '+243 81 000 0000').trim();
+    const studentProgram = (body.student_program || 'Programme Lyon').trim();
+
     await db.query(
       `INSERT INTO avi_requests (
-        ref, parent_name, country_name, city, nationality, residential_address, profession, phone, email,
-        has_france_guarantor, guarantor_details, session_date, student_name, student_program, passport_number,
-        chosen_offer, offer_title, interest_rate, duration_months, monthly_allowance_eur, monthly_allowance_usd,
-        monthly_allowance_cdf, usd_eur_rate, total_interest_eur, yimmiline_fee_eur, liec_remuneration_eur,
-        risk_score, documents_submitted, workflow_status
+        ref, parent_name, country, town, nationality, physical_address, occupation, phone, email,
+        other_guarantor, guarantor_details, expected_start, student_name, student_program, student_id_doc,
+        offer_key, offer_name, interest_rate, duration_months, principal_eur, principal_usd, principal_xaf,
+        usd_eur_rate, usd_xaf_rate, total_interest_eur, liec_fee_usd, files_count, supporting_docs, status
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
       )`,
       [
         ref,
-        body.parent_name || 'Parent Responsable',
+        parentName,
         body.country || body.country_name || 'RDC',
         body.town || body.city || 'Kinshasa',
         body.nationality || 'Congolaise',
         body.physical_address || body.residential_address || 'Kinshasa',
         body.occupation || body.profession || 'Cadre',
-        body.phone || '+243 81 000 0000',
+        parentPhone,
         body.email || 'parent@example.com',
         body.other_guarantor ?? body.has_france_guarantor ?? true,
         body.guarantor_details || 'Caution bancaire France vérifiée',
         body.expected_start || body.session_date || '2025-09',
-        body.student_name || 'Étudiant LIEC',
-        body.student_program || 'Programme Lyon',
+        studentName,
+        studentProgram,
         passportId,
         offerKey,
         offerMeta.name,
@@ -95,14 +99,26 @@ export async function POST(req: NextRequest) {
         principalUsd,
         principalXaf,
         usdEurRate,
+        usdXafRate,
         totalInterestEur,
-        totalInterestEur - liecRetainedEur,
         liecRetainedEur,
-        4,
+        Number(body.files_count) || 3,
         body.supporting_docs || body.documents_submitted || 'Passeport, Attestation hébergement, Fiches de paie',
         'Partner Review',
       ]
     );
+
+    // Save/update parent-student link
+    if (parentName && studentName) {
+      await db.query(
+        `INSERT INTO parent_student_links (parent_name, parent_phone, student_name, student_email, student_program, source)
+         VALUES ($1, $2, $3, $4, $5, 'avi')
+         ON CONFLICT (parent_name, student_name) DO UPDATE SET
+           parent_phone = COALESCE(EXCLUDED.parent_phone, parent_student_links.parent_phone),
+           student_program = COALESCE(EXCLUDED.student_program, parent_student_links.student_program)`,
+        [parentName, parentPhone, studentName, body.email || '', studentProgram]
+      );
+    }
 
     await db.query(
       `INSERT INTO audit_logs (actor, action, entity_ref, outcome, details)

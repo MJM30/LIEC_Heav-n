@@ -605,6 +605,41 @@ async function initSchemaAndSeed(client: DBClient) {
     ALTER TABLE avi_requests ADD COLUMN IF NOT EXISTS supporting_docs TEXT DEFAULT '';
   `);
 
+  // Ensure new Student Application and Parent Linking columns and tables exist
+  await client.exec(`
+    ALTER TABLE demandes ADD COLUMN IF NOT EXISTS parent_full_name VARCHAR(150);
+    ALTER TABLE demandes ADD COLUMN IF NOT EXISTS parent_phone VARCHAR(30);
+    ALTER TABLE demandes ADD COLUMN IF NOT EXISTS graduation_year VARCHAR(10);
+    ALTER TABLE demandes ADD COLUMN IF NOT EXISTS current_activity VARCHAR(25);
+    ALTER TABLE demandes ADD COLUMN IF NOT EXISTS final_year_university VARCHAR(10);
+
+    ALTER TABLE candidats ADD COLUMN IF NOT EXISTS parent_full_name VARCHAR(150);
+    ALTER TABLE candidats ADD COLUMN IF NOT EXISTS parent_phone VARCHAR(30);
+    ALTER TABLE candidats ADD COLUMN IF NOT EXISTS graduation_year VARCHAR(10);
+    ALTER TABLE candidats ADD COLUMN IF NOT EXISTS current_activity VARCHAR(25);
+    ALTER TABLE candidats ADD COLUMN IF NOT EXISTS final_year_university VARCHAR(10);
+
+    CREATE TABLE IF NOT EXISTS parent_student_links (
+      id SERIAL PRIMARY KEY,
+      parent_name VARCHAR(150) NOT NULL,
+      parent_phone VARCHAR(30),
+      student_name VARCHAR(150) NOT NULL,
+      student_email VARCHAR(160),
+      student_program VARCHAR(180),
+      source VARCHAR(50) DEFAULT 'application',
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(parent_name, student_name)
+    );
+
+    INSERT INTO parent_student_links (parent_name, parent_phone, student_name, student_email, student_program, source) VALUES
+      ('Jean-Pierre Kabangele', '+243 81 900 12 34', 'Dieudonné Kabangele', 'd.kabangele@unikin.ac.cd', 'MyDigitalSchool Lyon — Web Dev & UX/UI Design', 'seed'),
+      ('Jean-Pierre Kabangele', '+243 81 900 12 34', 'Sarah Kabangele', 'sarah.k@unikin.ac.cd', 'ISCOM Lyon — Communication, Publicité & Marketing', 'seed'),
+      ('Pauline Makosso', '+242 06 611 22 33', 'Brice Makosso', 'b.makosso@escom.cg', 'ISCOM Lyon — Communication, Advertising & Marketing', 'seed'),
+      ('Théophile Bopili', '+242 05 302 19 00', 'Aïcha Bopili', 'aicha.bopili@brazza-univ.cg', 'IHECF Lyon — Accounting, Audit & Finance', 'seed'),
+      ('Jean-Claude Mutombo', '+243 82 491 0023', 'Gloire Mutombo', 'gloire.mutombo@gmail.com', 'MyDigitalSchool Lyon — Dév. Web & UX/UI', 'seed')
+    ON CONFLICT (parent_name, student_name) DO NOTHING;
+  `);
+
   // Check if V4 English seed is already applied
   const checkV4 = await client.query<{ count: string | number }>(
     `SELECT COUNT(*) as count FROM priority_tasks WHERE title LIKE '%unassigned%'`

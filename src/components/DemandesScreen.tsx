@@ -785,6 +785,63 @@ export default function DemandesScreen({
               </div>
             </div>
 
+            {/* Parent & Academic Background (Linked Records) */}
+            {(selectedDemande.parent_full_name || selectedDemande.graduation_year || selectedDemande.current_activity) && (
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#0c685a]">
+                    PARENT LINK & ACADEMIC BACKGROUND
+                  </h3>
+                  <span className="text-[10px] font-extrabold text-[#0c685a] bg-[#eefaf6] px-2 py-0.5 rounded-md border border-[#ccece2]">
+                    Linked
+                  </span>
+                </div>
+
+                <div className="rounded-2xl bg-[#f3f7fc] p-4 space-y-2 text-xs">
+                  {selectedDemande.parent_full_name && (
+                    <div className="grid grid-cols-12 gap-2">
+                      <span className="col-span-5 text-slate-400 font-medium">Parent Full Name</span>
+                      <span className="col-span-7 font-extrabold text-[#092342]">
+                        {selectedDemande.parent_full_name}
+                      </span>
+                    </div>
+                  )}
+                  {selectedDemande.parent_phone && (
+                    <div className="grid grid-cols-12 gap-2">
+                      <span className="col-span-5 text-slate-400 font-medium">Parent Phone</span>
+                      <span className="col-span-7 font-semibold text-slate-700">
+                        {selectedDemande.parent_phone}
+                      </span>
+                    </div>
+                  )}
+                  {selectedDemande.graduation_year && (
+                    <div className="grid grid-cols-12 gap-2">
+                      <span className="col-span-5 text-slate-400 font-medium">Graduation Year</span>
+                      <span className="col-span-7 font-bold text-[#092342]">
+                        {selectedDemande.graduation_year}
+                      </span>
+                    </div>
+                  )}
+                  {selectedDemande.current_activity && (
+                    <div className="grid grid-cols-12 gap-2">
+                      <span className="col-span-5 text-slate-400 font-medium">Current Activity</span>
+                      <span className="col-span-7 font-semibold text-slate-700">
+                        {selectedDemande.current_activity}
+                      </span>
+                    </div>
+                  )}
+                  {selectedDemande.final_year_university && (
+                    <div className="grid grid-cols-12 gap-2">
+                      <span className="col-span-5 text-slate-400 font-medium">Final Year Univ.</span>
+                      <span className="col-span-7 font-semibold text-slate-700">
+                        {selectedDemande.final_year_university}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Internal Audit Log & Notes */}
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">

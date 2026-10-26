@@ -24,6 +24,50 @@ export async function POST(req: NextRequest) {
     const fullName = (body.full_name || body.name || 'Nouveau Candidat').trim();
     const email = (body.email || 'contact@exemple.com').trim();
     const phone = (body.phone || '+243 81 000 0000').trim();
+
+    // 1. Parent Full Name
+    const parentFullName = (body.parent_full_name || body.parent_name || '').trim();
+
+    // 2. Parent Phone Number (max 14 digits)
+    const parentPhone = (body.parent_phone || '').trim();
+    const parentPhoneDigits = parentPhone.replace(/\D/g, '');
+    if (parentPhoneDigits.length > 14) {
+      return NextResponse.json(
+        { error: 'Parent Phone Number must be limited to a maximum of 14 digits.' },
+        { status: 400 }
+      );
+    }
+
+    // 3. Year of Graduation (selection between 2010 and 2026)
+    const graduationYear = String(body.graduation_year || '').trim();
+    if (graduationYear) {
+      const gradNum = parseInt(graduationYear, 10);
+      if (isNaN(gradNum) || gradNum < 2010 || gradNum > 2026) {
+        return NextResponse.json(
+          { error: 'Year of Graduation must be between 2010 and 2026.' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 4. Current Activity (max 25 characters)
+    const currentActivity = (body.current_activity || '').trim();
+    if (currentActivity.length > 25) {
+      return NextResponse.json(
+        { error: 'Current Activity cannot exceed 25 characters.' },
+        { status: 400 }
+      );
+    }
+
+    // 5. Final Year of University (max 4 digits)
+    const finalYearUniversity = (body.final_year_university || '').trim();
+    if (finalYearUniversity.length > 4) {
+      return NextResponse.json(
+        { error: 'Final Year of University cannot exceed 4 digits.' },
+        { status: 400 }
+      );
+    }
+
     const countryName = (body.country_name || body.country || 'RDC').trim();
     const city = (
       body.city ||
@@ -56,10 +100,10 @@ export async function POST(req: NextRequest) {
 
     const insertRes = await db.query(
       `INSERT INTO demandes (
-        ref, initials, full_name, email, phone, whatsapp_verified, country_code, flag,
-        country_name, city, nationality, program, service_pole, target_cities, current_level,
+        ref, initials, full_name, email, phone, parent_full_name, parent_phone, graduation_year, current_activity, final_year_university,
+        whatsapp_verified, country_code, flag, country_name, city, nationality, program, service_pole, target_cities, current_level,
         budget_range, status, adviser, expected_start, message, submitted_at, is_dashboard_recent
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
       RETURNING *`,
       [
         ref,
@@ -67,6 +111,11 @@ export async function POST(req: NextRequest) {
         fullName,
         email,
         phone,
+        parentFullName || null,
+        parentPhone || null,
+        graduationYear || null,
+        currentActivity || null,
+        finalYearUniversity || null,
         true,
         countryMeta.code,
         countryMeta.flag,
@@ -86,6 +135,18 @@ export async function POST(req: NextRequest) {
         true,
       ]
     );
+
+    // Link Student to Parent in parent_student_links
+    if (parentFullName && fullName) {
+      await db.query(
+        `INSERT INTO parent_student_links (parent_name, parent_phone, student_name, student_email, student_program, source)
+         VALUES ($1, $2, $3, $4, $5, 'application')
+         ON CONFLICT (parent_name, student_name) DO UPDATE SET
+           parent_phone = COALESCE(EXCLUDED.parent_phone, parent_student_links.parent_phone),
+           student_program = COALESCE(EXCLUDED.student_program, parent_student_links.student_program)`,
+        [parentFullName, parentPhone, fullName, email, program]
+      );
+    }
 
     await db.query(
       `INSERT INTO demande_notes (demande_ref, author, timestamp_label, content)

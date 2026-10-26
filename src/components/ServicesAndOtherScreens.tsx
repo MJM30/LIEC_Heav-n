@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   CheckSquare,
   Award,
@@ -389,12 +389,18 @@ export function ServicesAviScreen({
   onNotify,
   lang = 'en',
   currentRole = 'avi',
+  parentStudentLinks = [],
+  demandes = [],
+  candidats = [],
 }: {
   aviRequests: any[];
   onCreateAvi: (data: any) => Promise<void>;
   onNotify: (msg: string) => void;
   lang?: Lang;
   currentRole?: string;
+  parentStudentLinks?: any[];
+  demandes?: any[];
+  candidats?: any[];
 }) {
   const isEn = lang === 'en';
 
@@ -419,6 +425,103 @@ export function ServicesAviScreen({
   // Passport ID starting with OP or PO + 9 digits (or 9 characters total)
   const [passportId, setPassportId] = useState('OP123456789');
   const [startDate, setStartDate] = useState('2025-09');
+
+  // Aggregate catalog of parents and their linked applicants to reuse records and avoid duplicates
+  const parentsCatalog = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        parent_name: string;
+        parent_phone: string;
+        students: { name: string; program?: string; email?: string }[];
+      }
+    >();
+
+    const addLink = (
+      pName: string,
+      sName: string,
+      pPhone?: string,
+      sProg?: string,
+      sEmail?: string
+    ) => {
+      const cleanP = (pName || '').trim();
+      const cleanS = (sName || '').trim();
+      if (!cleanP || !cleanS) return;
+      const key = cleanP.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, { parent_name: cleanP, parent_phone: pPhone || '', students: [] });
+      }
+      const item = map.get(key)!;
+      if (pPhone && !item.parent_phone) item.parent_phone = pPhone;
+      if (!item.students.some((s) => s.name.toLowerCase() === cleanS.toLowerCase())) {
+        item.students.push({ name: cleanS, program: sProg, email: sEmail });
+      }
+    };
+
+    // 1. From database parent_student_links
+    (parentStudentLinks || []).forEach((l: any) => {
+      addLink(l.parent_name, l.student_name, l.parent_phone, l.student_program, l.student_email);
+    });
+
+    // 2. From aviRequests
+    (aviRequests || []).forEach((a: any) => {
+      addLink(a.parent_name, a.student_name, a.phone, a.student_program, a.email);
+    });
+
+    // 3. From incoming student applications (demandes)
+    (demandes || []).forEach((d: any) => {
+      if (d.parent_full_name) {
+        addLink(d.parent_full_name, d.full_name, d.parent_phone, d.program, d.email);
+      }
+    });
+
+    // 4. Default seed links for safety and instant testing
+    addLink('Jean-Claude Mutombo', 'Gloire Mutombo', '+243 82 491 0023', 'MyDigitalSchool Lyon — Web Development, Digital Creation, Webmarketing & UX/UI Design', 'gloire.mutombo@gmail.com');
+    addLink('Jean-Pierre Kabangele', 'Dieudonné Kabangele', '+243 81 900 12 34', 'MyDigitalSchool Lyon — Web Dev & UX/UI Design', 'd.kabangele@unikin.ac.cd');
+    addLink('Jean-Pierre Kabangele', 'Sarah Kabangele', '+243 81 900 12 34', 'ISCOM Lyon — Communication, Publicité & Marketing', 'sarah.k@unikin.ac.cd');
+    addLink('Pauline Makosso', 'Brice Makosso', '+242 06 611 22 33', 'ISCOM Lyon — Communication, Advertising & Marketing', 'b.makosso@escom.cg');
+    addLink('Théophile Bopili', 'Aïcha Bopili', '+242 05 302 19 00', 'IHECF Lyon — Accounting, Audit & Finance', 'aicha.bopili@brazza-univ.cg');
+
+    return Array.from(map.values());
+  }, [parentStudentLinks, aviRequests, demandes]);
+
+  // Find linked students for current parentName
+  const linkedStudents = useMemo(() => {
+    const clean = parentName.trim().toLowerCase();
+    if (!clean) return [];
+    const found = parentsCatalog.find((p) => p.parent_name.toLowerCase() === clean);
+    return found ? found.students : [];
+  }, [parentName, parentsCatalog]);
+
+  const handleParentNameChange = (newName: string) => {
+    setParentName(newName);
+    const clean = newName.trim().toLowerCase();
+    const matched = parentsCatalog.find((p) => p.parent_name.toLowerCase() === clean);
+    if (matched) {
+      if (matched.parent_phone && (!phone || phone.includes('000 0000'))) {
+        setPhone(matched.parent_phone);
+      }
+      if (matched.students.length === 1) {
+        // Automatically populate Student Full Name field!
+        setStudentName(matched.students[0].name);
+        if (matched.students[0].program) {
+          setStudentProgram(matched.students[0].program);
+        }
+        onNotify(
+          isEn
+            ? `Student auto-populated: ${matched.students[0].name} (linked to parent ${matched.parent_name})`
+            : `Étudiant auto-rempli : ${matched.students[0].name} (rattaché au parent ${matched.parent_name})`
+        );
+      } else if (matched.students.length > 1) {
+        // Multi-student selection needed
+        onNotify(
+          isEn
+            ? `Multiple students linked to ${matched.parent_name}. Please choose the applicant below.`
+            : `Plusieurs étudiants sont liés à ${matched.parent_name}. Veuillez choisir le candidat ci-dessous.`
+        );
+      }
+    }
+  };
 
   // Multiple-choice Financing Type ('classique' | 'partiel1' | 'partiel2')
   const [offerKey, setOfferKey] = useState<'classique' | 'partiel1' | 'partiel2'>('classique');
@@ -1074,18 +1177,64 @@ export function ServicesAviScreen({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
             {/* 1. Parent Full Name */}
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">
-                {isEn ? '1. Parent Full Name *' : '1. Nom complet du parent *'}
-              </label>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block font-bold text-slate-700">
+                  {isEn ? '1. Parent Full Name *' : '1. Nom complet du parent *'}
+                </label>
+                {linkedStudents.length === 1 && (
+                  <span className="text-[10px] font-extrabold text-[#0c685a] bg-[#eefaf6] px-2 py-0.5 rounded-md border border-[#ccece2]">
+                    ✓ {isEn ? 'Student linked' : 'Étudiant lié'}
+                  </span>
+                )}
+                {linkedStudents.length > 1 && (
+                  <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                    ⚠️ {linkedStudents.length} {isEn ? 'students linked' : 'étudiants liés'}
+                  </span>
+                )}
+              </div>
+
+              {/* Existing parent quick-select dropdown */}
+              {parentsCatalog.length > 0 && (
+                <select
+                  value={parentsCatalog.some((p) => p.parent_name.toLowerCase() === parentName.trim().toLowerCase()) ? parentName : ''}
+                  onChange={(e) => {
+                    if (e.target.value) handleParentNameChange(e.target.value);
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-600 focus:bg-white transition"
+                >
+                  <option value="">
+                    {isEn ? '— Select from existing parents to auto-populate —' : '— Choisir parmi les parents existants pour auto-remplir —'}
+                  </option>
+                  {parentsCatalog.map((p) => (
+                    <option key={p.parent_name} value={p.parent_name}>
+                      👤 {p.parent_name} ({p.students.map((s) => s.name).join(', ')})
+                    </option>
+                  ))}
+                </select>
+              )}
+
               <input
                 type="text"
                 required
+                list="parents-catalog-datalist"
                 value={parentName}
-                onChange={(e) => setParentName(e.target.value)}
-                placeholder={isEn ? 'e.g. Jean-Claude Mutombo' : 'Ex: Jean-Claude Mutombo'}
+                onChange={(e) => handleParentNameChange(e.target.value)}
+                placeholder={isEn ? 'Type parent name or select above' : 'Saisir le nom du parent ou choisir ci-dessus'}
                 className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-semibold text-[#092342]"
               />
+              <datalist id="parents-catalog-datalist">
+                {parentsCatalog.map((p) => (
+                  <option key={p.parent_name} value={p.parent_name} />
+                ))}
+              </datalist>
+
+              {linkedStudents.length === 1 && (
+                <p className="text-[10.5px] font-semibold text-[#0c685a]">
+                  ✓ {isEn ? 'Linked Student auto-populated: ' : 'Étudiant lié auto-rempli : '}
+                  <strong>{linkedStudents[0].name}</strong>
+                </p>
+              )}
             </div>
 
             {/* 2. Profession (Free Text Field) */}
@@ -1110,10 +1259,41 @@ export function ServicesAviScreen({
             </div>
 
             {/* 3. Student Full Name */}
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">
+            <div className="space-y-1.5">
+              <label className="block font-bold text-slate-700">
                 {isEn ? '3. Student Full Name *' : "3. Nom complet de l'étudiant *"}
               </label>
+
+              {/* Multi-student selection if parent has multiple children */}
+              {linkedStudents.length > 1 && (
+                <div className="p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 space-y-1.5">
+                  <span className="text-[10.5px] font-extrabold text-amber-900 block">
+                    {isEn
+                      ? `Select applicant linked to ${parentName}:`
+                      : `Sélectionnez l’étudiant lié à ${parentName} :`}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {linkedStudents.map((st) => (
+                      <button
+                        key={st.name}
+                        type="button"
+                        onClick={() => {
+                          setStudentName(st.name);
+                          if (st.program) setStudentProgram(st.program);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                          studentName.toLowerCase() === st.name.toLowerCase()
+                            ? 'bg-[#0c685a] text-white shadow-xs'
+                            : 'bg-white border border-amber-300 text-amber-900 hover:bg-amber-100'
+                        }`}
+                      >
+                        <span>🎓 {st.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <input
                 type="text"
                 required
@@ -1122,6 +1302,12 @@ export function ServicesAviScreen({
                 placeholder={isEn ? 'e.g. Gloire Mutombo' : 'Ex: Gloire Mutombo'}
                 className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-semibold text-[#092342]"
               />
+
+              {linkedStudents.length === 1 && studentName.toLowerCase() === linkedStudents[0].name.toLowerCase() && (
+                <p className="text-[10.5px] font-semibold text-[#0c685a]">
+                  ✓ {isEn ? 'Verified applicant relationship with parent' : 'Filiation candidat vérifiée avec le parent'}
+                </p>
+              )}
             </div>
 
             {/* 4. Physical Address */}

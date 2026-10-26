@@ -126,6 +126,14 @@ export default function LiecWorkspacePage() {
   const [newDemPole, setNewDemPole] = useState('PREPA / MyDigitalSchool Lyon');
   const [newDemBudget, setNewDemBudget] = useState('8 500 € – 10 000 € / an');
 
+  // New Student Application and Parent Linking Fields
+  const [newDemParentName, setNewDemParentName] = useState('');
+  const [newDemParentPhone, setNewDemParentPhone] = useState('');
+  const [newDemGraduationYear, setNewDemGraduationYear] = useState('2024');
+  const [newDemCurrentActivity, setNewDemCurrentActivity] = useState('');
+  const [newDemFinalYearUni, setNewDemFinalYearUni] = useState('');
+  const [parentStudentLinks, setParentStudentLinks] = useState<any[]>([]);
+
   const isEn = lang === 'en';
   const tabLabels = isEn ? TAB_LABELS_EN : TAB_LABELS_FR;
 
@@ -147,6 +155,7 @@ export default function LiecWorkspacePage() {
           'prospects',
           'candidats',
           'prepa',
+          'services',
           'contenus',
           'notifications',
           'aide',
@@ -195,6 +204,7 @@ export default function LiecWorkspacePage() {
       setAuditLogs(data.auditLogs || []);
       if (data.users) setUsers(data.users);
       if (data.roles) setRoles(data.roles);
+      if (data.parentStudentLinks) setParentStudentLinks(data.parentStudentLinks);
     } catch (err) {
       console.error('Failed to fetch workspace:', err);
     } finally {
@@ -358,6 +368,38 @@ export default function LiecWorkspacePage() {
   const handleNewDemandeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDemName.trim()) return;
+
+    // Validate Parent Phone (max 14 digits)
+    const phoneDigits = newDemParentPhone.replace(/\D/g, '');
+    if (phoneDigits.length > 14) {
+      showToast(
+        isEn
+          ? 'Parent Phone Number must be limited to a maximum of 14 digits.'
+          : 'Le numéro de téléphone du parent ne peut pas dépasser 14 chiffres.'
+      );
+      return;
+    }
+
+    // Validate Current Activity (max 25 characters)
+    if (newDemCurrentActivity.trim().length > 25) {
+      showToast(
+        isEn
+          ? 'Current Activity cannot exceed 25 characters.'
+          : 'L’activité actuelle ne peut pas dépasser 25 caractères.'
+      );
+      return;
+    }
+
+    // Validate Final Year University (max 4 digits)
+    if (newDemFinalYearUni.trim().length > 4) {
+      showToast(
+        isEn
+          ? 'Final Year of University cannot exceed 4 digits.'
+          : 'La dernière année universitaire ne peut pas dépasser 4 chiffres.'
+      );
+      return;
+    }
+
     await handleCreateDemande({
       full_name: newDemName,
       email: newDemEmail || `${newDemName.toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
@@ -367,9 +409,20 @@ export default function LiecWorkspacePage() {
       program: newDemProgram,
       service_pole: newDemPole,
       budget_range: newDemBudget,
+      parent_full_name: newDemParentName.trim(),
+      parent_phone: newDemParentPhone.trim(),
+      graduation_year: newDemGraduationYear,
+      current_activity: newDemCurrentActivity.trim(),
+      final_year_university: newDemFinalYearUni.trim(),
     });
+
     setNewDemName('');
     setNewDemEmail('');
+    setNewDemParentName('');
+    setNewDemParentPhone('');
+    setNewDemGraduationYear('2024');
+    setNewDemCurrentActivity('');
+    setNewDemFinalYearUni('');
     setShowNewDemandeModal(false);
   };
 
@@ -1070,6 +1123,9 @@ export default function LiecWorkspacePage() {
                   onNotify={showToast}
                   lang={lang}
                   currentRole={rolePreview}
+                  parentStudentLinks={parentStudentLinks}
+                  demandes={demandes}
+                  candidats={candidats}
                 />
               )}
 
@@ -1216,7 +1272,7 @@ export default function LiecWorkspacePage() {
       {/* Modal: New Application - Accessible only by Admin & Secretary */}
       {showNewDemandeModal && (rolePreview === 'admin' || rolePreview === 'secretary') && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-elevated border border-slate-100 space-y-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-elevated border border-slate-100 space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-lg font-extrabold text-[#092342]">
@@ -1224,8 +1280,8 @@ export default function LiecWorkspacePage() {
                 </h3>
                 <p className="text-xs text-slate-500">
                   {isEn
-                    ? 'Direct lead creation into the LIEC Education PostgreSQL database.'
-                    : 'Création directe d’un lead dans la base PostgreSQL LIEC Education.'}
+                    ? 'Direct lead creation into the LIEC Education PostgreSQL database with parent linkage.'
+                    : 'Création directe d’un lead dans la base PostgreSQL LIEC Education avec rattachement parent.'}
                 </p>
               </div>
               <button
@@ -1236,159 +1292,269 @@ export default function LiecWorkspacePage() {
               </button>
             </div>
 
-            <form onSubmit={handleNewDemandeSubmit} className="space-y-3 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    {isEn ? 'Candidate Full Name *' : 'Nom complet du candidat *'}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newDemName}
-                    onChange={(e) => setNewDemName(e.target.value)}
-                    placeholder="Ex: Cédric Ilunga"
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    {isEn ? 'Email Address *' : 'Adresse e-mail *'}
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={newDemEmail}
-                    onChange={(e) => setNewDemEmail(e.target.value)}
-                    placeholder="cedric.ilunga@gmail.com"
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    {isEn ? 'Phone / WhatsApp *' : 'Téléphone / WhatsApp *'}
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={newDemPhone}
-                    onChange={(e) => setNewDemPhone(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    {isEn ? 'Recruitment Country *' : 'Pays de recrutement *'}
-                  </label>
-                  <select
-                    value={newDemCountry}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setNewDemCountry(val);
-                      setNewDemCity(val === 'RDC' ? 'Kinshasa' : 'Brazzaville');
-                      setNewDemPhone(val === 'RDC' ? '+243 ' : '+242 ');
-                    }}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 bg-white font-semibold"
-                  >
-                    <option value="RDC">🇨🇩 RDC (Kinshasa / Lubumbashi / Goma)</option>
-                    <option value="Congo-Brazzaville">
-                      🇨🇬 Congo-Brazzaville (Brazzaville / Pointe-Noire)
-                    </option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    {isEn ? 'City of Origin' : "Ville d'origine"}
-                  </label>
-                  <select
-                    value={newDemCity}
-                    onChange={(e) => setNewDemCity(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 bg-white"
-                  >
-                    {newDemCountry === 'RDC' ? (
-                      <>
-                        <option value="Kinshasa">Kinshasa</option>
-                        <option value="Lubumbashi">Lubumbashi</option>
-                        <option value="Goma">Goma</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="Brazzaville">Brazzaville</option>
-                        <option value="Pointe-Noire">Pointe-Noire</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    {isEn ? 'Study Destination' : "Destination d'études"}
-                  </label>
-                  <input
-                    type="text"
-                    readOnly
-                    value={isEn ? 'Lyon (Exclusive Destination)' : 'Lyon (Exclusivement)'}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-extrabold text-[#0c685a]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    {isEn ? 'Partner School in Lyon *' : 'École Partenaire à Lyon *'}
-                  </label>
-                  <select
-                    value={newDemProgram}
-                    onChange={(e) => {
-                      setNewDemProgram(e.target.value);
-                      setNewDemPole(`PREPA / ${e.target.value.split('—')[0]?.trim()}`);
-                    }}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 bg-white font-semibold"
-                  >
-                    <option value="ISCOM Lyon — Communication, Publicité & Marketing">
-                      1. ISCOM Lyon (Communication, marketing & events)
-                    </option>
-                    <option value="MyDigitalSchool Lyon — Dév. Web & UX/UI">
-                      2. MyDigitalSchool Lyon (Web dev, digital & UX/UI)
-                    </option>
-                    <option value="École Internationale Tunon Lyon — Tourisme & Hôtellerie">
-                      3. École Internationale Tunon Lyon (Tourism, hospitality & PR)
-                    </option>
-                    <option value="IHECF Lyon — Comptabilité, Finance & Audit">
-                      4. IHECF Lyon (Accounting, finance & audit)
-                    </option>
-                    <option value="Ipac Bachelor Factory Lyon — Commerce & Logistique">
-                      5. Ipac Bachelor Factory Lyon (Commerce, management & logistics)
-                    </option>
-                    <option value="MBway Lyon — Management & Commerce International">
-                      6. MBway Lyon (Management, entrepreneurship & HR)
-                    </option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    {isEn ? 'Guaranteed Annual Budget' : 'Budget annuel garanti'}
-                  </label>
-                  <input
-                    type="text"
-                    value={newDemBudget}
-                    onChange={(e) => setNewDemBudget(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5"
-                  />
+            <form onSubmit={handleNewDemandeSubmit} className="space-y-4 text-xs">
+              {/* Candidate Personal Details */}
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#0c685a] block">
+                  {isEn ? '1. Candidate Information' : '1. Informations du Candidat'}
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isEn ? 'Candidate Full Name *' : 'Nom complet du candidat *'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newDemName}
+                      onChange={(e) => setNewDemName(e.target.value)}
+                      placeholder="Ex: Cédric Ilunga"
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isEn ? 'Email Address *' : 'Adresse e-mail *'}
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={newDemEmail}
+                      onChange={(e) => setNewDemEmail(e.target.value)}
+                      placeholder="cedric.ilunga@gmail.com"
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isEn ? 'Phone / WhatsApp *' : 'Téléphone / WhatsApp *'}
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={newDemPhone}
+                      onChange={(e) => setNewDemPhone(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isEn ? 'Recruitment Country *' : 'Pays de recrutement *'}
+                    </label>
+                    <select
+                      value={newDemCountry}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewDemCountry(val);
+                        setNewDemCity(val === 'RDC' ? 'Kinshasa' : 'Brazzaville');
+                        setNewDemPhone(val === 'RDC' ? '+243 ' : '+242 ');
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 bg-white font-semibold"
+                    >
+                      <option value="RDC">🇨🇩 RDC (Kinshasa / Lubumbashi / Goma)</option>
+                      <option value="Congo-Brazzaville">
+                        🇨🇬 Congo-Brazzaville (Brazzaville / Pointe-Noire)
+                      </option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isEn ? 'City of Origin' : "Ville d'origine"}
+                    </label>
+                    <select
+                      value={newDemCity}
+                      onChange={(e) => setNewDemCity(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 bg-white"
+                    >
+                      {newDemCountry === 'RDC' ? (
+                        <>
+                          <option value="Kinshasa">Kinshasa</option>
+                          <option value="Lubumbashi">Lubumbashi</option>
+                          <option value="Goma">Goma</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="Brazzaville">Brazzaville</option>
+                          <option value="Pointe-Noire">Pointe-Noire</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isEn ? 'Study Destination' : "Destination d'études"}
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={isEn ? 'Lyon (Exclusive Destination)' : 'Lyon (Exclusivement)'}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-extrabold text-[#0c685a]"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="pt-3 flex justify-end gap-2">
+              {/* Parent & Family Information Section (Requirements 1 & 2) */}
+              <div className="pt-2 border-t border-slate-100 space-y-2.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#0c685a] block">
+                  {isEn ? '2. Parent & Family Information' : '2. Informations du Parent & Famille'}
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isEn ? 'Parent Full Name' : 'Nom complet du parent'}
+                    </label>
+                    <input
+                      type="text"
+                      value={newDemParentName}
+                      onChange={(e) => setNewDemParentName(e.target.value)}
+                      placeholder={isEn ? 'e.g. Jean-Pierre Kabangele' : 'Ex: Jean-Pierre Kabangele'}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>{isEn ? 'Parent Phone Number' : 'Téléphone du parent'}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        {newDemParentPhone.replace(/\D/g, '').length}/14 {isEn ? 'digits max' : 'chiffres max'}
+                      </span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={newDemParentPhone}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val.replace(/\D/g, '').length <= 14) {
+                          setNewDemParentPhone(val);
+                        }
+                      }}
+                      placeholder="+243 81 900 1234"
+                      maxLength={18}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Academic Background & Activity Section (Requirements 1 & 2) */}
+              <div className="pt-2 border-t border-slate-100 space-y-2.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#0c685a] block">
+                  {isEn ? '3. Academic Background & Activity' : '3. Parcours Académique & Activité'}
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isEn ? 'Year of Graduation' : 'Année d’obtention diplôme'}
+                    </label>
+                    <select
+                      value={newDemGraduationYear}
+                      onChange={(e) => setNewDemGraduationYear(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 bg-white font-semibold"
+                    >
+                      {[2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011, 2010].map((yr) => (
+                        <option key={yr} value={String(yr)}>
+                          {yr}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>{isEn ? 'Current Activity' : 'Activité actuelle'}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">{newDemCurrentActivity.length}/25</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={25}
+                      value={newDemCurrentActivity}
+                      onChange={(e) => setNewDemCurrentActivity(e.target.value.slice(0, 25))}
+                      placeholder={isEn ? 'e.g. Student / Intern' : 'Ex: Étudiant / Stagiaire'}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>{isEn ? 'Final Year Univ.' : 'Dernière année univ.'}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">max 4 {isEn ? 'digits' : 'chiffres'}</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={newDemFinalYearUni}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        setNewDemFinalYearUni(val);
+                      }}
+                      placeholder="2024"
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-semibold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Program & Budget */}
+              <div className="pt-2 border-t border-slate-100 space-y-2.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#0c685a] block">
+                  {isEn ? '4. Partner School & Budget' : '4. École Partenaire & Budget'}
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isEn ? 'Partner School in Lyon *' : 'École Partenaire à Lyon *'}
+                    </label>
+                    <select
+                      value={newDemProgram}
+                      onChange={(e) => {
+                        setNewDemProgram(e.target.value);
+                        setNewDemPole(`PREPA / ${e.target.value.split('—')[0]?.trim()}`);
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 bg-white font-semibold"
+                    >
+                      <option value="ISCOM Lyon — Communication, Publicité & Marketing">
+                        1. ISCOM Lyon (Communication, marketing & events)
+                      </option>
+                      <option value="MyDigitalSchool Lyon — Dév. Web & UX/UI">
+                        2. MyDigitalSchool Lyon (Web dev, digital & UX/UI)
+                      </option>
+                      <option value="École Internationale Tunon Lyon — Tourisme & Hôtellerie">
+                        3. École Internationale Tunon Lyon (Tourism, hospitality & PR)
+                      </option>
+                      <option value="IHECF Lyon — Comptabilité, Finance & Audit">
+                        4. IHECF Lyon (Accounting, finance & audit)
+                      </option>
+                      <option value="Ipac Bachelor Factory Lyon — Commerce & Logistique">
+                        5. Ipac Bachelor Factory Lyon (Commerce, management & logistics)
+                      </option>
+                      <option value="MBway Lyon — Management & Commerce International">
+                        6. MBway Lyon (Management, entrepreneurship & HR)
+                      </option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isEn ? 'Guaranteed Annual Budget' : 'Budget annuel garanti'}
+                    </label>
+                    <input
+                      type="text"
+                      value={newDemBudget}
+                      onChange={(e) => setNewDemBudget(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowNewDemandeModal(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600"
+                  className="rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 hover:bg-slate-50 transition"
                 >
                   {isEn ? 'Cancel' : 'Annuler'}
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-[#0c6358] hover:bg-[#094e45] text-white px-5 py-2 font-extrabold"
+                  className="rounded-xl bg-[#0c6358] hover:bg-[#094e45] text-white px-5 py-2 font-extrabold shadow-sm transition"
                 >
                   {isEn ? 'Create Application' : 'Créer la demande'}
                 </button>

@@ -46,6 +46,11 @@ CREATE TABLE IF NOT EXISTS demandes (
   full_name VARCHAR(150) NOT NULL,
   email VARCHAR(160) NOT NULL,
   phone VARCHAR(60) NOT NULL,
+  parent_full_name VARCHAR(150),
+  parent_phone VARCHAR(30),
+  graduation_year VARCHAR(10),
+  current_activity VARCHAR(25),
+  final_year_university VARCHAR(10),
   whatsapp_verified BOOLEAN NOT NULL DEFAULT TRUE,
   country_code VARCHAR(10) NOT NULL DEFAULT 'CD',
   flag VARCHAR(16) NOT NULL DEFAULT '🇨🇩',
@@ -114,6 +119,11 @@ CREATE TABLE IF NOT EXISTS candidats (
   status_right VARCHAR(80) NOT NULL DEFAULT 'J-14 CF',
   email VARCHAR(160) DEFAULT 'd.kabangele@unikin.ac.cd',
   phone VARCHAR(60) DEFAULT '+243 81 552 1904',
+  parent_full_name VARCHAR(150),
+  parent_phone VARCHAR(30),
+  graduation_year VARCHAR(10),
+  current_activity VARCHAR(25),
+  final_year_university VARCHAR(10),
   country VARCHAR(100) DEFAULT 'RDC (Kinshasa)',
   nationality VARCHAR(100) DEFAULT 'Congolaise (RDC)',
   current_diploma VARCHAR(180) DEFAULT 'Licence Informatique (Mention TB) - UNIKIN',
@@ -125,6 +135,18 @@ CREATE TABLE IF NOT EXISTS candidats (
   notes_json TEXT NOT NULL,
   pieces_json TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS parent_student_links (
+  id SERIAL PRIMARY KEY,
+  parent_name VARCHAR(150) NOT NULL,
+  parent_phone VARCHAR(30),
+  student_name VARCHAR(150) NOT NULL,
+  student_email VARCHAR(160),
+  student_program VARCHAR(180),
+  source VARCHAR(50) DEFAULT 'application',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(parent_name, student_name)
 );
 
 CREATE TABLE IF NOT EXISTS priority_tasks (
