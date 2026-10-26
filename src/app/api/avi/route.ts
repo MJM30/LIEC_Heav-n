@@ -39,8 +39,14 @@ export async function POST(req: NextRequest) {
     const countRes = await db.query<{ count: string | number }>(
       'SELECT COUNT(*) as count FROM avi_requests'
     );
-    const nextNum = 1 + Number(countRes.rows[0]?.count ?? 0);
-    const ref = `AVI-2025-${String(nextNum).padStart(3, '0')}`;
+    let nextNum = 1 + Number(countRes.rows[0]?.count ?? 0);
+    let ref = `AVI-2025-${String(nextNum).padStart(3, '0')}`;
+    while (true) {
+      const existing = await db.query('SELECT 1 FROM avi_requests WHERE ref = $1', [ref]);
+      if (existing.rowCount === 0) break;
+      nextNum++;
+      ref = `AVI-2025-${String(nextNum).padStart(3, '0')}`;
+    }
 
     const offerMap: Record<string, { name: string; rate: number; months: number }> = {
       classique: { name: 'Classique', rate: 12.0, months: 8 },

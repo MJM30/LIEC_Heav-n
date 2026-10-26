@@ -957,7 +957,8 @@ export function ServicesAviScreen({
                 </label>
                 <input
                   type="number"
-                  step={0.0001}
+                  step="any"
+                  min={0}
                   value={eurUsdRate}
                   onChange={(e) => {
                     const r = Number(e.target.value) || 0;
@@ -976,7 +977,8 @@ export function ServicesAviScreen({
                 </label>
                 <input
                   type="number"
-                  step={0.01}
+                  step="any"
+                  min={0}
                   value={eurXafRate}
                   onChange={(e) => {
                     const r = Number(e.target.value) || 0;
@@ -1035,7 +1037,7 @@ export function ServicesAviScreen({
                 </div>
                 <input
                   type="number"
-                  step={50}
+                  step="any"
                   min={0}
                   value={amountEur}
                   onChange={(e) => handleEurChange(Number(e.target.value) || 0)}
@@ -1065,7 +1067,7 @@ export function ServicesAviScreen({
                 </div>
                 <input
                   type="number"
-                  step={50}
+                  step="any"
                   min={0}
                   value={amountUsd}
                   onChange={(e) => handleUsdChange(Number(e.target.value) || 0)}
@@ -1090,7 +1092,7 @@ export function ServicesAviScreen({
                 </div>
                 <input
                   type="number"
-                  step={10000}
+                  step="any"
                   min={0}
                   value={amountXaf}
                   onChange={(e) => handleXafChange(Number(e.target.value) || 0)}
