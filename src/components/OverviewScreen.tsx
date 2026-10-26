@@ -127,7 +127,7 @@ export default function OverviewScreen({
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0c6358] hover:bg-[#094f46] text-white font-semibold text-xs px-5 py-2.5 shadow-sm transition"
             >
               <Plus className="w-4 h-4" />
-              {isEn ? 'New Application' : 'Nouvelle Demande'}
+              {isEn ? '+ Record New Student Application' : '+ Nouvelle Demande Candidat'}
             </button>
           )}
         </div>

@@ -51,7 +51,9 @@ export default function CandidatsScreen({
   onAdvanceJalon,
   onTogglePiece,
   onNotify,
+  lang = 'en',
 }: CandidatsScreenProps) {
+  const isEn = lang === 'en';
   const [cohortFilter, setCohortFilter] = useState('');
   const [activeSubTab, setActiveSubTab] = useState(4);
   const [noteText, setNoteText] = useState('');
@@ -65,6 +67,11 @@ export default function CandidatsScreen({
   const [newCandProgram, setNewCandProgram] = useState(
     'MyDigitalSchool Lyon — Web dev, digital creation, webmarketing & UX/UI design'
   );
+  const [newCandParentName, setNewCandParentName] = useState('');
+  const [newCandParentPhone, setNewCandParentPhone] = useState('');
+  const [newCandGraduationYear, setNewCandGraduationYear] = useState('2024');
+  const [newCandCurrentActivity, setNewCandCurrentActivity] = useState('');
+  const [newCandFinalYearUni, setNewCandFinalYearUni] = useState('');
 
   // New Voeu Form
   const [voeuUniv, setVoeuUniv] = useState('ISCOM Lyon');
@@ -115,14 +122,40 @@ export default function CandidatsScreen({
   const handleCreateCandSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCandName.trim()) return;
+
+    const phoneDigits = newCandParentPhone.replace(/\D/g, '');
+    if (phoneDigits.length > 14) {
+      onNotify(isEn ? 'Parent Phone Number must be limited to a maximum of 14 digits.' : 'Le numéro de téléphone du parent ne peut pas dépasser 14 chiffres.');
+      return;
+    }
+    if (newCandCurrentActivity.trim().length > 25) {
+      onNotify(isEn ? 'Current Activity cannot exceed 25 characters.' : 'L’activité actuelle ne peut pas dépasser 25 caractères.');
+      return;
+    }
+    if (newCandFinalYearUni.trim().length > 4) {
+      onNotify(isEn ? 'Final Year of University cannot exceed 4 digits.' : 'La dernière année universitaire ne peut pas dépasser 4 chiffres.');
+      return;
+    }
+
     await onCreateCandidat({
       full_name: newCandName.trim(),
       program: newCandProgram,
       country: newCandCountry,
       cities: 'Lyon (Exclusive)',
       adviser: 'Sarah Mwamba',
+      parent_full_name: newCandParentName.trim(),
+      parent_phone: newCandParentPhone.trim(),
+      graduation_year: newCandGraduationYear,
+      current_activity: newCandCurrentActivity.trim(),
+      final_year_university: newCandFinalYearUni.trim(),
     });
+
     setNewCandName('');
+    setNewCandParentName('');
+    setNewCandParentPhone('');
+    setNewCandGraduationYear('2024');
+    setNewCandCurrentActivity('');
+    setNewCandFinalYearUni('');
     setShowNewCandidatModal(false);
   };
 
@@ -888,7 +921,73 @@ export default function CandidatsScreen({
                   </select>
                 </div>
               </div>
-              <div className="pt-3 flex justify-end gap-2">
+
+              {/* Parent & Family Info */}
+              <div className="grid grid-cols-2 gap-3 pt-1 border-t border-slate-100">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">{isEn ? 'Parent Full Name' : 'Nom complet parent'}</label>
+                  <input
+                    type="text"
+                    value={newCandParentName}
+                    onChange={(e) => setNewCandParentName(e.target.value)}
+                    placeholder="Jean-Pierre Kabangele"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">{isEn ? 'Parent Phone (max 14)' : 'Tél. parent (max 14)'}</label>
+                  <input
+                    type="tel"
+                    value={newCandParentPhone}
+                    onChange={(e) => {
+                      if (e.target.value.replace(/\D/g, '').length <= 14) setNewCandParentPhone(e.target.value);
+                    }}
+                    placeholder="+243 81 900 1234"
+                    maxLength={18}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                  />
+                </div>
+              </div>
+
+              {/* Academic Background */}
+              <div className="grid grid-cols-3 gap-2.5 pt-1 border-t border-slate-100">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">{isEn ? 'Graduation' : 'Diplôme'}</label>
+                  <select
+                    value={newCandGraduationYear}
+                    onChange={(e) => setNewCandGraduationYear(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-2 bg-white"
+                  >
+                    {[2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011, 2010].map(y => (
+                      <option key={y} value={String(y)}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">{isEn ? 'Current Activity' : 'Activité'}</label>
+                  <input
+                    type="text"
+                    maxLength={25}
+                    value={newCandCurrentActivity}
+                    onChange={(e) => setNewCandCurrentActivity(e.target.value.slice(0, 25))}
+                    placeholder="Student"
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">{isEn ? 'Final Yr Univ.' : 'Dern. Année'}</label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    value={newCandFinalYearUni}
+                    onChange={(e) => setNewCandFinalYearUni(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    placeholder="2024"
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-2 font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowNewCandidatModal(false)}

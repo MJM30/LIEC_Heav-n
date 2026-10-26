@@ -33,10 +33,10 @@ export async function GET(req: NextRequest) {
       rolesRes,
       parentLinksRes,
     ] = await Promise.all([
-      db.query('SELECT * FROM demandes ORDER BY id ASC'),
+      db.query('SELECT * FROM demandes ORDER BY id DESC'),
       db.query('SELECT * FROM demande_notes ORDER BY id ASC'),
       db.query('SELECT * FROM prospects ORDER BY id ASC'),
-      db.query('SELECT * FROM candidats ORDER BY id ASC'),
+      db.query('SELECT * FROM candidats ORDER BY id DESC'),
       db.query('SELECT * FROM priority_tasks ORDER BY id ASC'),
       db.query('SELECT * FROM avi_requests ORDER BY id DESC'),
       db.query('SELECT * FROM prepa_cohorts ORDER BY id ASC'),

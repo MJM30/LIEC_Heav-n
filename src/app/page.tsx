@@ -341,28 +341,47 @@ export default function LiecWorkspacePage() {
 
   // API Handlers
   const handleCreateDemande = async (payload: any): Promise<string | undefined> => {
-    const res = await fetch('/api/demandes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) {
-      const json = await res.json();
-      await fetchWorkspace();
-      setSelectedDemandeRef(json.ref);
+    try {
+      const activeEmail =
+        currentUser?.email ||
+        (rolePreview === 'secretary'
+          ? 'marc.kouassi@liec-education.com'
+          : rolePreview === 'avi'
+          ? 'alain.kanza@liec-education.com'
+          : 'sarah.mwamba@liec-education.com');
+
+      const res = await fetch('/api/demandes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-email': activeEmail,
+        },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        await fetchWorkspace(activeEmail);
+        if (json.ref) setSelectedDemandeRef(json.ref);
+        showToast(
+          isEn
+            ? `New student applicant ${json.ref} saved in PostgreSQL.`
+            : `Nouvelle demande candidat ${json.ref} créée dans PostgreSQL.`
+        );
+        return json.ref;
+      }
       showToast(
-        isEn
-          ? `New application ${json.ref} saved in PostgreSQL.`
-          : `Nouvelle demande ${json.ref} créée dans PostgreSQL.`
+        json.error ||
+          json.message ||
+          (isEn ? 'Error while creating application.' : 'Erreur lors de la création de la demande.')
       );
-      return json.ref;
+      return undefined;
+    } catch (err: any) {
+      showToast(
+        err?.message ||
+          (isEn ? 'Error while creating application.' : 'Erreur lors de la création de la demande.')
+      );
+      return undefined;
     }
-    showToast(
-      isEn
-        ? 'Error while creating application.'
-        : 'Erreur lors de la création de la demande.'
-    );
-    return undefined;
   };
 
   const handleNewDemandeSubmit = async (e: React.FormEvent) => {
@@ -400,10 +419,10 @@ export default function LiecWorkspacePage() {
       return;
     }
 
-    await handleCreateDemande({
-      full_name: newDemName,
-      email: newDemEmail || `${newDemName.toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
-      phone: newDemPhone,
+    const createdRef = await handleCreateDemande({
+      full_name: newDemName.trim(),
+      email: newDemEmail.trim() || `${newDemName.trim().toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
+      phone: newDemPhone.trim(),
       country_name: newDemCountry,
       city: `${newDemCity}, ${newDemCountry}`,
       program: newDemProgram,
@@ -416,14 +435,18 @@ export default function LiecWorkspacePage() {
       final_year_university: newDemFinalYearUni.trim(),
     });
 
-    setNewDemName('');
-    setNewDemEmail('');
-    setNewDemParentName('');
-    setNewDemParentPhone('');
-    setNewDemGraduationYear('2024');
-    setNewDemCurrentActivity('');
-    setNewDemFinalYearUni('');
-    setShowNewDemandeModal(false);
+    if (createdRef) {
+      setNewDemName('');
+      setNewDemEmail('');
+      setNewDemParentName('');
+      setNewDemParentPhone('');
+      setNewDemGraduationYear('2024');
+      setNewDemCurrentActivity('');
+      setNewDemFinalYearUni('');
+      setShowNewDemandeModal(false);
+      // Immediately navigate to demandes tab so the new applicant is shown at the top
+      setActiveTab('demandes');
+    }
   };
 
   const handleAddDemandeNote = async (ref: string, content: string) => {
@@ -533,19 +556,43 @@ export default function LiecWorkspacePage() {
   };
 
   const handleCreateCandidat = async (data: any) => {
-    const res = await fetch('/api/candidats', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (res.ok) {
-      const json = await res.json();
-      await fetchWorkspace();
-      if (json.ref) setSelectedCandidatRef(json.ref);
+    try {
+      const activeEmail =
+        currentUser?.email ||
+        (rolePreview === 'secretary'
+          ? 'marc.kouassi@liec-education.com'
+          : rolePreview === 'avi'
+          ? 'alain.kanza@liec-education.com'
+          : 'sarah.mwamba@liec-education.com');
+
+      const res = await fetch('/api/candidats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-email': activeEmail,
+        },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        await fetchWorkspace(activeEmail);
+        if (json.ref) setSelectedCandidatRef(json.ref);
+        showToast(
+          isEn
+            ? `New candidate file ${json.ref} created.`
+            : `Nouveau dossier candidat ${json.ref} créé.`
+        );
+      } else {
+        showToast(
+          json.error ||
+            json.message ||
+            (isEn ? 'Error creating candidate file.' : 'Erreur création dossier candidat.')
+        );
+      }
+    } catch (err: any) {
       showToast(
-        isEn
-          ? `New candidate file ${json.ref} created.`
-          : `Nouveau dossier candidat ${json.ref} créé.`
+        err?.message ||
+          (isEn ? 'Error creating candidate file.' : 'Erreur création dossier candidat.')
       );
     }
   };
@@ -1270,7 +1317,7 @@ export default function LiecWorkspacePage() {
       </div>
 
       {/* Modal: New Application - Accessible only by Admin & Secretary */}
-      {showNewDemandeModal && (rolePreview === 'admin' || rolePreview === 'secretary') && (
+      {showNewDemandeModal && (rolePreview === 'admin' || rolePreview === 'secretary' || userRole === 'admin' || userRole === 'secretary') && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-elevated border border-slate-100 space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -1406,11 +1453,31 @@ export default function LiecWorkspacePage() {
                     </label>
                     <input
                       type="text"
+                      list="existing-parents-new-demande"
                       value={newDemParentName}
-                      onChange={(e) => setNewDemParentName(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewDemParentName(val);
+                        const matched = parentStudentLinks.filter(
+                          (l) => l.parent_name.toLowerCase().trim() === val.toLowerCase().trim()
+                        );
+                        if (matched.length === 1) {
+                          if (!newDemName || newDemName === '') {
+                            setNewDemName(matched[0].student_name);
+                          }
+                          if (matched[0].parent_phone && (!newDemParentPhone || newDemParentPhone === '')) {
+                            setNewDemParentPhone(matched[0].parent_phone);
+                          }
+                        }
+                      }}
                       placeholder={isEn ? 'e.g. Jean-Pierre Kabangele' : 'Ex: Jean-Pierre Kabangele'}
                       className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-semibold"
                     />
+                    <datalist id="existing-parents-new-demande">
+                      {Array.from(new Set(parentStudentLinks.map((l) => l.parent_name))).map((pName) => (
+                        <option key={pName} value={pName} />
+                      ))}
+                    </datalist>
                   </div>
                   <div>
                     <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
@@ -1434,6 +1501,43 @@ export default function LiecWorkspacePage() {
                     />
                   </div>
                 </div>
+                {/* Multiple linked students selector */}
+                {newDemParentName.trim() &&
+                  parentStudentLinks.filter(
+                    (l) => l.parent_name.toLowerCase().trim() === newDemParentName.toLowerCase().trim()
+                  ).length > 1 && (
+                    <div className="rounded-xl bg-teal-50 border border-teal-200 p-2.5 text-xs text-[#064e3b] space-y-1.5">
+                      <span className="font-bold block">
+                        {isEn
+                          ? `Select applicant linked to ${newDemParentName}:`
+                          : `Sélectionner le candidat lié à ${newDemParentName} :`}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {parentStudentLinks
+                          .filter(
+                            (l) =>
+                              l.parent_name.toLowerCase().trim() === newDemParentName.toLowerCase().trim()
+                          )
+                          .map((l, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => {
+                                setNewDemName(l.student_name);
+                                if (l.parent_phone) setNewDemParentPhone(l.parent_phone);
+                              }}
+                              className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] transition ${
+                                newDemName === l.student_name
+                                  ? 'bg-[#0c6358] text-white border-[#0c6358]'
+                                  : 'bg-white text-[#092342] border-teal-200 hover:bg-teal-100'
+                              }`}
+                            >
+                              ✓ {l.student_name} ({l.student_program || 'Dossier'})
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
               </div>
 
               {/* Academic Background & Activity Section (Requirements 1 & 2) */}

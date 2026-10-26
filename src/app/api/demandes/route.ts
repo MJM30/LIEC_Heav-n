@@ -91,12 +91,18 @@ export async function POST(req: NextRequest) {
     ).trim();
 
     const countRes = await db.query<{ count: string | number }>('SELECT COUNT(*) as count FROM demandes');
-    const nextNum = 89 + Number(countRes.rows[0]?.count ?? 0);
-    const ref = `#DEM-2025-${String(nextNum).padStart(3, '0')}`;
+    let nextNum = 89 + Number(countRes.rows[0]?.count ?? 0);
+    let ref = `#DEM-2025-${String(nextNum).padStart(3, '0')}`;
+    while (true) {
+      const existing = await db.query('SELECT 1 FROM demandes WHERE ref = $1', [ref]);
+      if (existing.rowCount === 0) break;
+      nextNum++;
+      ref = `#DEM-2025-${String(nextNum).padStart(3, '0')}`;
+    }
     const initials = getInitials(fullName);
     const countryMeta = COUNTRY_MAP[countryName] || { code: 'CD', flag: '🇨🇩' };
 
-    const nowLabel = "Soumis à l'instant";
+    const nowLabel = 'Just now';
 
     const insertRes = await db.query(
       `INSERT INTO demandes (
@@ -226,8 +232,14 @@ export async function PATCH(req: NextRequest) {
       await db.query(`UPDATE demandes SET status = 'Convertie' WHERE ref = $1`, [ref]);
 
       const canCountRes = await db.query<{ count: string | number }>('SELECT COUNT(*) as count FROM candidats');
-      const nextCanNum = 43 + Number(canCountRes.rows[0]?.count ?? 0);
-      const canRef = `#CAN-2025-${String(nextCanNum).padStart(3, '0')}`;
+      let nextCanNum = 43 + Number(canCountRes.rows[0]?.count ?? 0);
+      let canRef = `#CAN-2025-${String(nextCanNum).padStart(3, '0')}`;
+      while (true) {
+        const existingCan = await db.query('SELECT 1 FROM candidats WHERE ref = $1', [canRef]);
+        if (existingCan.rowCount === 0) break;
+        nextCanNum++;
+        canRef = `#CAN-2025-${String(nextCanNum).padStart(3, '0')}`;
+      }
 
       const schoolCode = dem.program.includes('ISCOM')
         ? 'ISCO'

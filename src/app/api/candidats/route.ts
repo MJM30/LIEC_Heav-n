@@ -15,8 +15,19 @@ export async function POST(req: NextRequest) {
     const country = (body.country || 'RDC (Kinshasa)').trim();
 
     const countRes = await db.query<{ count: string | number }>('SELECT COUNT(*) as count FROM candidats');
-    const nextNum = 43 + Number(countRes.rows[0]?.count ?? 0);
-    const ref = `#CAN-2025-${String(nextNum).padStart(3, '0')}`;
+    let nextNum = 43 + Number(countRes.rows[0]?.count ?? 0);
+    let ref = `#CAN-2025-${String(nextNum).padStart(3, '0')}`;
+    while (true) {
+      const existingCan = await db.query('SELECT 1 FROM candidats WHERE ref = $1', [ref]);
+      if (existingCan.rowCount === 0) break;
+      nextNum++;
+      ref = `#CAN-2025-${String(nextNum).padStart(3, '0')}`;
+    }
+    const parentFullName = (body.parent_full_name || body.parent_name || '').trim();
+    const parentPhone = (body.parent_phone || '').trim();
+    const graduationYear = String(body.graduation_year || '').trim();
+    const currentActivity = (body.current_activity || '').trim();
+    const finalYearUniversity = (body.final_year_university || '').trim();
     const parts = fullName.split(/\s+/);
     const initials =
       parts.length >= 2
@@ -108,9 +119,10 @@ export async function POST(req: NextRequest) {
       `INSERT INTO candidats (
         ref, initials, full_name, avatar_url, program, cities, adviser,
         stage_badge, stage_badge_tone, progress_pct, status_left, status_right,
-        email, phone, country, nationality, current_diploma, tcf_score,
+        email, phone, parent_full_name, parent_phone, graduation_year, current_activity, final_year_university,
+        country, nationality, current_diploma, tcf_score,
         garant_info, interview_date, jalons_json, voeux_json, notes_json, pieces_json
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)`,
       [
         ref,
         initials,
@@ -126,6 +138,11 @@ export async function POST(req: NextRequest) {
         'J-30 CF',
         email,
         phone,
+        parentFullName || null,
+        parentPhone || null,
+        graduationYear || null,
+        currentActivity || null,
+        finalYearUniversity || null,
         country,
         country,
         'Licence / Bac+3 (En cours)',
@@ -138,6 +155,17 @@ export async function POST(req: NextRequest) {
         JSON.stringify(pieces),
       ]
     );
+
+    if (parentFullName && fullName) {
+      await db.query(
+        `INSERT INTO parent_student_links (parent_name, parent_phone, student_name, student_email, student_program, source)
+         VALUES ($1, $2, $3, $4, $5, 'candidate')
+         ON CONFLICT (parent_name, student_name) DO UPDATE SET
+           parent_phone = COALESCE(EXCLUDED.parent_phone, parent_student_links.parent_phone),
+           student_program = COALESCE(EXCLUDED.student_program, parent_student_links.student_program)`,
+        [parentFullName, parentPhone, fullName, email, program]
+      );
+    }
 
     await db.query(
       `INSERT INTO audit_logs (actor, action, entity_ref, outcome)
