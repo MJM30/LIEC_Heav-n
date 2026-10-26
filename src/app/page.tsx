@@ -86,8 +86,10 @@ export default function LiecWorkspacePage() {
   const [lang, setLang] = useState<Lang>('en'); // English as primary language by default
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [userRole, setUserRole] = useState<'admin' | 'secretary' | 'avi'>('admin');
+  const [userRole, setUserRole] = useState<'admin' | 'secretary' | 'avi' | null>(null);
   const [rolePreview, setRolePreview] = useState<'admin' | 'secretary' | 'avi'>('admin');
   const [globalSearch, setGlobalSearch] = useState('');
   const [showNewDemandeModal, setShowNewDemandeModal] = useState(false);
@@ -200,44 +202,61 @@ export default function LiecWorkspacePage() {
     }
   }, [rolePreview, isEn, showToast]);
 
-  // Initial load ONCE on mount
+  // Initial authentication enforcement & load ONCE on mount
   useEffect(() => {
-    let initialEmail = 'sarah.mwamba@liec-education.com';
     const savedUserStr = localStorage.getItem('liec_user');
-    if (savedUserStr) {
-      try {
-        const u = JSON.parse(savedUserStr);
-        setCurrentUser(u);
-        if (u.role === 'admin' || u.role === 'secretary' || u.role === 'avi') {
-          setUserRole(u.role);
-          setRolePreview(u.role);
-          if (u.role === 'avi') {
-            setActiveTab('services');
-          } else {
-            setActiveTab('overview');
-          }
-        }
-        if (u.email) initialEmail = u.email;
-      } catch (e) {
-        console.warn('Could not parse user:', e);
+    if (!savedUserStr) {
+      setCheckingAuth(false);
+      setIsAuthenticated(false);
+      router.replace('/login');
+      return;
+    }
+
+    try {
+      const u = JSON.parse(savedUserStr);
+      if (!u || !u.email || !['admin', 'secretary', 'avi'].includes(u.role)) {
+        localStorage.removeItem('liec_user');
+        localStorage.removeItem('liec_role');
+        setCheckingAuth(false);
+        setIsAuthenticated(false);
+        router.replace('/login');
+        return;
       }
-    }
 
-    const savedLang = localStorage.getItem('liec_lang') as Lang | null;
-    if (savedLang === 'fr' || savedLang === 'en') {
-      setLang(savedLang);
-    } else {
-      setLang('fr');
-      localStorage.setItem('liec_lang', 'fr');
-    }
+      setCurrentUser(u);
+      setUserRole(u.role);
+      setRolePreview(u.role);
+      setIsAuthenticated(true);
+      setCheckingAuth(false);
 
-    const savedTheme = localStorage.getItem('liec_theme');
-    if (savedTheme === 'dark') {
-      setDarkMode(true);
-      document.documentElement.classList.add('dark');
-    }
+      if (u.role === 'avi') {
+        setActiveTab('services');
+      } else {
+        setActiveTab('overview');
+      }
 
-    fetchWorkspace(initialEmail);
+      const savedLang = localStorage.getItem('liec_lang') as Lang | null;
+      if (savedLang === 'fr' || savedLang === 'en') {
+        setLang(savedLang);
+      } else {
+        setLang('en');
+      }
+
+      const savedTheme = localStorage.getItem('liec_theme');
+      if (savedTheme === 'dark') {
+        setDarkMode(true);
+        document.documentElement.classList.add('dark');
+      }
+
+      fetchWorkspace(u.email);
+    } catch (e) {
+      console.warn('Could not parse user:', e);
+      localStorage.removeItem('liec_user');
+      localStorage.removeItem('liec_role');
+      setCheckingAuth(false);
+      setIsAuthenticated(false);
+      router.replace('/login');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -607,6 +626,30 @@ export default function LiecWorkspacePage() {
     { id: 'aide', label: tabLabels.aide, icon: HelpCircle },
   ];
 
+  if (checkingAuth || !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f6f9fc] p-6 text-center">
+        <div className="flex items-center gap-3 mb-6">
+          <img
+            src="/logo_LIEC.jpeg"
+            alt="LIEC Logo"
+            className="h-12 w-12 rounded-2xl object-contain shadow-md bg-white p-1 border border-slate-200"
+          />
+          <div className="text-left">
+            <div className="text-xl font-extrabold tracking-tight text-[#092342]">LIEC One</div>
+            <div className="text-xs font-semibold text-slate-500">Education Management Workspace</div>
+          </div>
+        </div>
+        <div className="h-8 w-8 rounded-full border-3 border-[#0c685a] border-t-transparent animate-spin mb-4" />
+        <p className="text-xs font-extrabold text-slate-600">
+          {isEn
+            ? 'Enforcing staff security session & permissions...'
+            : 'Vérification de la session sécurisée et des permissions...'}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex bg-[#f6f9fc] text-[#092342]">
       {/* Left Sidebar (Desktop + Mobile Drawer) */}
@@ -768,7 +811,8 @@ export default function LiecWorkspacePage() {
               onClick={() => {
                 localStorage.removeItem('liec_user');
                 localStorage.removeItem('liec_role');
-                router.push('/login');
+                document.cookie = 'liec_user_email=; path=/; max-age=0; SameSite=Lax';
+                router.replace('/login');
               }}
               title={isEn ? 'Log out' : 'Se déconnecter'}
               className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/70 hover:text-[#092342] transition shrink-0 cursor-pointer"

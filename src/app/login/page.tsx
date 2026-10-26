@@ -13,6 +13,42 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const TEST_CREDENTIALS = [
+    {
+      role: 'admin',
+      label: 'Administrateur (Sarah)',
+      email: 'admin@liec-education.com',
+      password: 'Admin@LIEC2026!',
+      color: '#0c685a',
+      bg: '#e8f8f4',
+      border: '#bbf0df',
+    },
+    {
+      role: 'secretary',
+      label: 'Secrétaire (Marc)',
+      email: 'secretary@liec-education.com',
+      password: 'Secretary@LIEC2026!',
+      color: '#007da7',
+      bg: '#eaf6fb',
+      border: '#c2e7f6',
+    },
+    {
+      role: 'avi',
+      label: 'Officier AVI (Alain)',
+      email: 'avi@liec-education.com',
+      password: 'AviOfficer@LIEC2026!',
+      color: '#b45309',
+      bg: '#fef3c7',
+      border: '#fde68a',
+    },
+  ];
+
+  const fillCredentials = (accEmail: string, accPass: string) => {
+    setEmail(accEmail);
+    setPassword(accPass);
+    setError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -22,45 +58,58 @@ export default function LoginPage() {
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, remember }),
+        body: JSON.stringify({ email: email.trim(), password: password.trim(), remember }),
       });
       const data = await res.json();
       if (res.ok && data.user) {
         localStorage.setItem('liec_user', JSON.stringify(data.user));
         localStorage.setItem('liec_role', data.user.role);
+        document.cookie = `liec_user_email=${encodeURIComponent(data.user.email)}; path=/; max-age=604800; SameSite=Lax`;
         router.push('/');
       } else {
-        setError(data.error || 'Identifiants invalides.');
+        setError(data.error || 'Identifiants invalides. Vérifiez votre email et mot de passe.');
       }
     } catch {
-      // Fallback local en cas d'indisponibilité réseau
+      // Validation stricte hors-ligne uniquement si correspondance exacte
       const lower = email.trim().toLowerCase();
-      let matchedRole: 'admin' | 'secretary' | 'avi' = 'admin';
-      let matchedName = 'Sarah Mwamba';
-      let matchedTitle = 'Administrateur / Conseillère Senior';
+      const pass = password.trim();
 
-      if (lower.includes('marc') || lower.includes('secretary') || lower.includes('secretaire')) {
-        matchedRole = 'secretary';
-        matchedName = 'Marc Kouassi';
-        matchedTitle = 'Secrétaire Orientation & Admissions';
-      } else if (lower.includes('alain') || lower.includes('avi') || lower.includes('kanza')) {
-        matchedRole = 'avi';
-        matchedName = 'Alain Kanza';
-        matchedTitle = 'Officier Financement AVI';
+      const matched = TEST_CREDENTIALS.find(
+        (t) =>
+          (t.email.toLowerCase() === lower ||
+            (t.role === 'admin' && lower === 'sarah.mwamba@liec-education.com') ||
+            (t.role === 'secretary' && lower === 'marc.kouassi@liec-education.com') ||
+            (t.role === 'avi' && lower === 'alain.kanza@liec-education.com')) &&
+          t.password === pass
+      );
+
+      if (matched) {
+        const fallbackUser = {
+          id: matched.role === 'admin' ? 1 : matched.role === 'secretary' ? 2 : 3,
+          name:
+            matched.role === 'admin'
+              ? 'Sarah Mwamba'
+              : matched.role === 'secretary'
+              ? 'Marc Kouassi'
+              : 'Alain Kanza',
+          email: matched.email,
+          role: matched.role,
+          title:
+            matched.role === 'admin'
+              ? 'Administrateur / Conseillère Senior'
+              : matched.role === 'secretary'
+              ? 'Secrétaire Orientation & Admissions'
+              : 'Officier Financement AVI',
+          initials: matched.role === 'admin' ? 'SM' : matched.role === 'secretary' ? 'MK' : 'AK',
+        };
+
+        localStorage.setItem('liec_user', JSON.stringify(fallbackUser));
+        localStorage.setItem('liec_role', fallbackUser.role);
+        document.cookie = `liec_user_email=${encodeURIComponent(fallbackUser.email)}; path=/; max-age=604800; SameSite=Lax`;
+        router.push('/');
+      } else {
+        setError('Identifiants invalides. Vérifiez l’adresse email et le mot de passe.');
       }
-
-      const fallbackUser = {
-        id: 1,
-        name: matchedName,
-        email: email || 'sarah.mwamba@liec-education.com',
-        role: matchedRole,
-        title: matchedTitle,
-        initials: matchedName.split(' ').map((n) => n[0]).join(''),
-      };
-
-      localStorage.setItem('liec_user', JSON.stringify(fallbackUser));
-      localStorage.setItem('liec_role', fallbackUser.role);
-      router.push('/');
     } finally {
       setLoading(false);
     }
@@ -521,10 +570,42 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <div className="divider">STAFF ACCESS</div>
+            <div className="divider">STAFF TEST ACCOUNTS</div>
 
-            <div className="demo-note">
-              <strong>Espace réservé :</strong> Seul le personnel autorisé de LIEC Education peut accéder à cet espace de travail sécurisé.
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+              {TEST_CREDENTIALS.map((acc) => (
+                <button
+                  key={acc.role}
+                  type="button"
+                  onClick={() => fillCredentials(acc.email, acc.password)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: `1px solid ${acc.border}`,
+                    background: acc.bg,
+                    color: '#092342',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div>
+                    <span style={{ color: acc.color, fontWeight: 800 }}>{acc.label}</span>
+                    <div style={{ fontSize: '10px', color: '#64748b' }}>{acc.email}</div>
+                  </div>
+                  <span style={{ fontSize: '10.5px', color: acc.color, fontWeight: 700 }}>
+                    Remplir →
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="demo-note" style={{ marginTop: '12px' }}>
+              <strong>Accès strict :</strong> Le bouton <em>« + New Application »</em> est visible uniquement pour <strong>Admin</strong> et <strong>Secretary</strong>. Il est strictement masqué pour le profil <strong>Officer AVI</strong>.
             </div>
           </div>
         </section>

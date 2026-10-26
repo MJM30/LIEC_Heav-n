@@ -45,7 +45,7 @@ export default function OverviewScreen({
   onResetTasks,
   onNotify,
   lang = 'en',
-  userRole = 'admin',
+  userRole,
 }: OverviewScreenProps) {
   const isEn = lang === 'en';
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('month');

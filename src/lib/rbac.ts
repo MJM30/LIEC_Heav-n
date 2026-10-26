@@ -96,7 +96,27 @@ export const PRECONFIGURED_USERS_RBAC: Record<string, AuthenticatedUserContext> 
     initials: 'SM',
     active: true,
   },
+  'admin@liec-education.com': {
+    id: 1,
+    name: 'Sarah Mwamba',
+    email: 'sarah.mwamba@liec-education.com',
+    business_profile: 'Admin',
+    technical_roles: ['admin', 'lh_security_admin'],
+    title: 'Senior Lyon Advisor & Platform Admin',
+    initials: 'SM',
+    active: true,
+  },
   'marc.kouassi@liec-education.com': {
+    id: 2,
+    name: 'Marc Kouassi',
+    email: 'marc.kouassi@liec-education.com',
+    business_profile: 'Secretary',
+    technical_roles: ['lh_internal', 'ITIL'],
+    title: 'Admissions & Intake Secretary',
+    initials: 'MK',
+    active: true,
+  },
+  'secretary@liec-education.com': {
     id: 2,
     name: 'Marc Kouassi',
     email: 'marc.kouassi@liec-education.com',
@@ -116,7 +136,45 @@ export const PRECONFIGURED_USERS_RBAC: Record<string, AuthenticatedUserContext> 
     initials: 'AK',
     active: true,
   },
+  'avi@liec-education.com': {
+    id: 3,
+    name: 'Alain Kanza',
+    email: 'alain.kanza@liec-education.com',
+    business_profile: 'Finance Officer',
+    technical_roles: ['lh_finance'],
+    title: 'Head of Lyon Visa & AVI Desk',
+    initials: 'AK',
+    active: true,
+  },
+  'officer.avi@liec-education.com': {
+    id: 3,
+    name: 'Alain Kanza',
+    email: 'alain.kanza@liec-education.com',
+    business_profile: 'Finance Officer',
+    technical_roles: ['lh_finance'],
+    title: 'Head of Lyon Visa & AVI Desk',
+    initials: 'AK',
+    active: true,
+  },
 };
+
+export function canonicalizeUserEmail(rawEmail?: string | null): string {
+  const e = (rawEmail || '').trim().toLowerCase();
+  if (e === 'admin@liec-education.com' || e === 'admin@liec.com') {
+    return 'sarah.mwamba@liec-education.com';
+  }
+  if (e === 'secretary@liec-education.com' || e === 'secretaire@liec-education.com') {
+    return 'marc.kouassi@liec-education.com';
+  }
+  if (
+    e === 'avi@liec-education.com' ||
+    e === 'officer.avi@liec-education.com' ||
+    e === 'finance@liec-education.com'
+  ) {
+    return 'alain.kanza@liec-education.com';
+  }
+  return e;
+}
 
 /**
  * Access Matrix Rule Definition
@@ -257,13 +315,28 @@ export async function authenticateServerRequest(
 
   const cookieEmail = req.cookies.get('liec_user_email')?.value;
 
-  const targetEmail = (
+  const rawEmail = (
     headerEmail ||
     bearerEmail ||
     queryEmail ||
     cookieEmail ||
-    'sarah.mwamba@liec-education.com' // Safe default fallback for UI preview
-  ).trim().toLowerCase();
+    ''
+  ).trim();
+
+  if (!rawEmail) {
+    return {
+      success: false,
+      response: NextResponse.json(
+        {
+          error: 'Accès non autorisé / Unauthorized',
+          message: 'Session ou identifiants manquants. Veuillez vous connecter sur /login.',
+        },
+        { status: 401 }
+      ),
+    };
+  }
+
+  const targetEmail = canonicalizeUserEmail(rawEmail);
 
   let user: AuthenticatedUserContext | null = null;
 
@@ -300,7 +373,20 @@ export async function authenticateServerRequest(
   }
 
   if (!user) {
-    user = PRECONFIGURED_USERS_RBAC[targetEmail] || PRECONFIGURED_USERS_RBAC['sarah.mwamba@liec-education.com'];
+    user = PRECONFIGURED_USERS_RBAC[targetEmail] || null;
+  }
+
+  if (!user) {
+    return {
+      success: false,
+      response: NextResponse.json(
+        {
+          error: 'Utilisateur non reconnu / User not found',
+          message: 'Cet utilisateur ne fait pas partie du personnel autorisé de LIEC Education.',
+        },
+        { status: 401 }
+      ),
+    };
   }
 
   // Check account suspension status
