@@ -80,6 +80,7 @@ export interface AuthenticatedUserContext {
   title: string;
   initials: string;
   active: boolean;
+  must_change_password?: boolean;
   suspended_at?: string | null;
   suspended_by?: string | null;
 }
@@ -386,12 +387,12 @@ export async function authenticateServerRequest(
     const db = dbClient || (await getDb());
     const res = await db.query(
       `SELECT u.id, u.name, u.email, u.business_profile, u.role, u.title, u.initials,
-              u.active, u.suspended_at, u.suspended_by,
+              u.active, u.suspended_at, u.suspended_by, u.must_change_password,
               COALESCE(ARRAY_AGG(ur.role_id) FILTER (WHERE ur.role_id IS NOT NULL), ARRAY[]::VARCHAR[]) as technical_roles
        FROM users u
        LEFT JOIN user_roles ur ON u.id = ur.user_id
        WHERE LOWER(u.email) = $1
-       GROUP BY u.id, u.name, u.email, u.business_profile, u.role, u.title, u.initials, u.active, u.suspended_at, u.suspended_by`,
+       GROUP BY u.id, u.name, u.email, u.business_profile, u.role, u.title, u.initials, u.active, u.suspended_at, u.suspended_by, u.must_change_password`,
       [targetEmail]
     );
 
@@ -416,6 +417,7 @@ export async function authenticateServerRequest(
         active: Boolean(r.active),
         suspended_at: r.suspended_at,
         suspended_by: r.suspended_by,
+        must_change_password: Boolean(r.must_change_password),
       };
     }
   } catch (err) {
@@ -448,6 +450,23 @@ export async function authenticateServerRequest(
           error: 'Compte suspendu / Account Suspended',
           message: 'Votre compte a été suspendu par un administrateur. Accès révoqué.',
           user: { name: user.name, email: user.email, active: false },
+        },
+        { status: 403 }
+      ),
+    };
+  }
+
+  // Enforce mandatory first-login password change before workspace access
+  if (user.must_change_password) {
+    return {
+      success: false,
+      response: NextResponse.json(
+        {
+          error: 'Changement de mot de passe obligatoire / Password Change Required',
+          error_en: 'First Login: Password change is mandatory before accessing workspace.',
+          error_fr: 'Première connexion : Le changement de mot de passe est obligatoire.',
+          requirePasswordChange: true,
+          must_change_password: true,
         },
         { status: 403 }
       ),

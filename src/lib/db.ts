@@ -537,6 +537,11 @@ async function initSchemaAndSeed(client: DBClient) {
       title VARCHAR(100) NOT NULL DEFAULT 'Conseillère Senior',
       initials VARCHAR(10) NOT NULL DEFAULT 'SM',
       active BOOLEAN NOT NULL DEFAULT TRUE,
+      password_hash VARCHAR(255),
+      password_salt VARCHAR(64),
+      must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
+      last_login TIMESTAMP WITH TIME ZONE,
+      password_updated_at TIMESTAMP WITH TIME ZONE,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -699,6 +704,11 @@ async function initSchemaAndSeed(client: DBClient) {
       description TEXT NOT NULL,
       safeguards TEXT NOT NULL,
       active BOOLEAN NOT NULL DEFAULT TRUE,
+      password_hash VARCHAR(255),
+      password_salt VARCHAR(64),
+      must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
+      last_login TIMESTAMP WITH TIME ZONE,
+      password_updated_at TIMESTAMP WITH TIME ZONE,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -725,6 +735,11 @@ async function initSchemaAndSeed(client: DBClient) {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP WITH TIME ZONE;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_by VARCHAR(120);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_salt VARCHAR(64);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP WITH TIME ZONE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_updated_at TIMESTAMP WITH TIME ZONE;
     ALTER TABLE demande_notes ADD COLUMN IF NOT EXISTS timestamp_label VARCHAR(60) DEFAULT 'Today';
 
     -- Seed Technical Roles from RBAC Specification if empty

@@ -29,6 +29,9 @@ import {
   Unlock,
   SlidersHorizontal,
   Eye,
+  EyeOff,
+  Copy,
+  Share2,
   X,
   Check,
   Info,
@@ -2356,6 +2359,18 @@ export function ParametresGovernanceScreen({
   const [newUserRoles, setNewUserRoles] = useState<string[]>(['lh_internal', 'ITIL']);
   const [newUserTitle, setNewUserTitle] = useState('');
 
+  // Created User Credentials Confirmation Dialog State (Admin-only visibility)
+  const [createdUserCredentials, setCreatedUserCredentials] = useState<{
+    name: string;
+    email: string;
+    business_profile: string;
+    technical_roles: string[];
+    temporaryPassword: string;
+  } | null>(null);
+  const [showCreatedPassword, setShowCreatedPassword] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
+
   // Edit Roles Modal State
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [editProfile, setEditProfile] = useState<'Admin' | 'Secretary' | 'Finance Officer'>('Secretary');
@@ -2471,16 +2486,31 @@ export function ParametresGovernanceScreen({
         }),
       });
       if (res.ok) {
+        const data = await res.json();
         setShowCreateModal(false);
         setNewUserName('');
         setNewUserEmail('');
         setNewUserTitle('');
         await fetchUsersAndRoles();
         onRefreshWorkspace?.();
+
+        if (data.temporaryPassword) {
+          setCreatedUserCredentials({
+            name: data.user?.name || newUserName.trim(),
+            email: data.user?.email || cleanEmail,
+            business_profile: data.user?.business_profile || newUserProfile,
+            technical_roles: newUserRoles,
+            temporaryPassword: data.temporaryPassword,
+          });
+          setShowCreatedPassword(false);
+          setCopiedPassword(false);
+          setCopiedInvite(false);
+        }
+
         showFeedback(
           isEn
-            ? `User account created and technical roles assigned.`
-            : `Utilisateur créé et rôles techniques assignés avec succès.`
+            ? `User account created with secure default password.`
+            : `Compte utilisateur créé avec mot de passe temporaire sécurisé.`
         );
       } else {
         const err = await res.json();
@@ -3139,6 +3169,161 @@ export function ParametresGovernanceScreen({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: TEMPORARY PASSWORD CONFIRMATION DIALOG (FOR ADMIN CREATOR ONLY) */}
+      {createdUserCredentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-scaleUp border border-[#bbf0df]">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                  <Key className="w-5 h-5 text-[#0c685a]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-[#092342]">
+                    {isEn ? 'User Account Created Successfully' : 'Compte Utilisateur Créé avec Succès'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {isEn ? 'One-time secure temporary password generated' : 'Mot de passe temporaire unique généré'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCreatedUserCredentials(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Account Summary */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-semibold">{isEn ? 'Full Name:' : 'Nom complet :'}</span>
+                <span className="font-extrabold text-[#092342]">{createdUserCredentials.name}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-semibold">{isEn ? 'Work Email:' : 'Email professionnel :'}</span>
+                <span className="font-mono font-bold text-[#0c685a]">{createdUserCredentials.email}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-semibold">{isEn ? 'Business Profile:' : 'Profil Métier :'}</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#e0f8ef] text-[#0c685a]">
+                  {createdUserCredentials.business_profile}
+                </span>
+              </div>
+            </div>
+
+            {/* Temporary Password Box */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                <span>{isEn ? 'Default Temporary Password' : 'Mot de passe temporaire sécurisé'}</span>
+                <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                  {isEn ? 'Visible only now' : 'Affiché uniquement maintenant'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showCreatedPassword ? 'text' : 'password'}
+                    readOnly
+                    value={createdUserCredentials.temporaryPassword}
+                    className="w-full rounded-xl border border-slate-300 bg-slate-100/90 px-3.5 py-2.5 text-xs font-mono font-extrabold text-[#092342] tracking-wider select-all focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatedPassword(!showCreatedPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 p-1"
+                    title={showCreatedPassword ? (isEn ? 'Hide password' : 'Masquer') : (isEn ? 'Reveal password' : 'Révéler')}
+                  >
+                    {showCreatedPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdUserCredentials.temporaryPassword);
+                    setCopiedPassword(true);
+                    setTimeout(() => setCopiedPassword(false), 3000);
+                  }}
+                  className={`px-3 py-2.5 rounded-xl border text-xs font-extrabold flex items-center gap-1.5 transition ${
+                    copiedPassword
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {copiedPassword ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>{isEn ? 'Copied' : 'Copié'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>{isEn ? 'Copy' : 'Copier'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Secure Share Invitation Button */}
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  const shareText = isEn
+                    ? `Welcome to LIEC Heav’n Workspace.\n\nYour account has been created:\n- Login URL: ${window.location.origin}/login\n- Username / Email: ${createdUserCredentials.email}\n- Temporary Password: ${createdUserCredentials.temporaryPassword}\n\nSecurity Policy: You are required to create a new personal password immediately upon your first login.`
+                    : `Bienvenue sur l'espace LIEC Heav’n Workspace.\n\nVotre compte collaborateur a été créé :\n- Lien de connexion : ${window.location.origin}/login\n- Identifiant / Email : ${createdUserCredentials.email}\n- Mot de passe temporaire : ${createdUserCredentials.temporaryPassword}\n\nPolitique de sécurité : Vous serez invité à définir votre mot de passe personnel dès votre première connexion.`;
+                  navigator.clipboard.writeText(shareText);
+                  setCopiedInvite(true);
+                  setTimeout(() => setCopiedInvite(false), 3000);
+                }}
+                className={`w-full py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition ${
+                  copiedInvite
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                {copiedInvite ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span>{isEn ? 'Invitation Details Copied to Clipboard!' : 'Message d’invitation copié !'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-4 h-4 text-slate-500" />
+                    <span>{isEn ? 'Copy Secure Invitation Message' : 'Copier le message d’invitation sécurisé'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Security Warning Notice */}
+            <div className="rounded-xl bg-amber-50 border border-amber-200/80 p-3 text-[11px] text-amber-900 flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                <strong className="block font-bold">
+                  {isEn ? 'Mandatory First-Login Password Change Enforced' : 'Changement de mot de passe obligatoire'}
+                </strong>
+                {isEn
+                  ? 'For security compliance, this temporary password is never saved in plain text and cannot be retrieved later. The new user will be strictly required to configure their own personal password upon their first login before accessing any workspace features.'
+                  : 'Par conformité de sécurité, ce mot de passe temporaire n’est jamais enregistré en clair et ne pourra plus être consulté. Le collaborateur devra obligatoirement définir son mot de passe personnel dès sa première connexion avant d’accéder au workspace.'}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t">
+              <button
+                type="button"
+                onClick={() => setCreatedUserCredentials(null)}
+                className="px-5 py-2 rounded-xl bg-[#0c685a] hover:bg-[#094e45] text-white font-extrabold text-xs"
+              >
+                {isEn ? 'Done & Close' : 'Terminé'}
+              </button>
+            </div>
           </div>
         </div>
       )}

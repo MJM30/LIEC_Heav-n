@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { enforceRbac } from '@/lib/rbac';
+import { generateSecureTemporaryPassword, hashPassword } from '@/lib/passwordSecurity';
 
 /**
  * Admin User-Management Workflow API (ServiceNow-Inspired RBAC)
@@ -16,11 +17,11 @@ export async function GET(req: NextRequest) {
   try {
     const usersRes = await db.query(
       `SELECT u.id, u.name, u.email, u.business_profile, u.role, u.title, u.initials,
-              u.active, u.suspended_at, u.suspended_by, u.created_at,
+              u.active, u.suspended_at, u.suspended_by, u.must_change_password, u.created_at,
               COALESCE(ARRAY_AGG(ur.role_id) FILTER (WHERE ur.role_id IS NOT NULL), ARRAY[]::VARCHAR[]) as technical_roles
        FROM users u
        LEFT JOIN user_roles ur ON u.id = ur.user_id
-       GROUP BY u.id, u.name, u.email, u.business_profile, u.role, u.title, u.initials, u.active, u.suspended_at, u.suspended_by, u.created_at
+       GROUP BY u.id, u.name, u.email, u.business_profile, u.role, u.title, u.initials, u.active, u.suspended_at, u.suspended_by, u.must_change_password, u.created_at
        ORDER BY u.id ASC`
     );
 
@@ -76,12 +77,16 @@ export async function POST(req: NextRequest) {
     if (businessProfile === 'Admin') legacyRole = 'admin';
     else if (businessProfile === 'Finance Officer') legacyRole = 'avi';
 
-    // Insert user
+    // Generate cryptographically strong temporary password & hash
+    const temporaryPassword = generateSecureTemporaryPassword();
+    const { hash: passwordHash, salt: passwordSalt } = hashPassword(temporaryPassword);
+
+    // Insert user with secure hash and mandatory first-login password change
     const insertRes = await db.query(
-      `INSERT INTO users (name, email, business_profile, role, title, initials, active)
-       VALUES ($1, $2, $3, $4, $5, $6, TRUE)
-       RETURNING id, name, email, business_profile, title, active`,
-      [name, email, businessProfile, legacyRole, title, initials]
+      `INSERT INTO users (name, email, business_profile, role, title, initials, active, password_hash, password_salt, must_change_password)
+       VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7, $8, TRUE)
+       RETURNING id, name, email, business_profile, role, title, initials, active, must_change_password`,
+      [name, email, businessProfile, legacyRole, title, initials, passwordHash, passwordSalt]
     );
 
     const newUser = insertRes.rows[0];
@@ -96,18 +101,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Audit log entry
+    // Audit log entry (NEVER log the plain-text password)
     await db.query(
       `INSERT INTO audit_logs (actor, action, entity_ref, outcome, details)
        VALUES ($1, 'CREATE_USER', $2, 'SUCCESS', $3)`,
       [
         adminUser.name,
         `USER-${newUser.id}`,
-        `Created user '${name}' with profile '${businessProfile}' and roles [${technicalRoles.join(', ')}]`,
+        `Created user '${name}' with profile '${businessProfile}' and roles [${technicalRoles.join(', ')}]. One-time temporary password generated with mandatory first-login change.`,
       ]
     );
 
-    return NextResponse.json({ success: true, user: newUser });
+    return NextResponse.json({
+      success: true,
+      user: newUser,
+      temporaryPassword,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

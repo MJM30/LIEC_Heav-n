@@ -22,7 +22,7 @@ interface TwoFaSetupData {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<'credentials' | '2fa'>('credentials');
+  const [step, setStep] = useState<'credentials' | '2fa' | 'first_login_password_change'>('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
@@ -32,6 +32,15 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [twoFaData, setTwoFaData] = useState<TwoFaSetupData | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
+
+  // Mandatory First-Login Password Change State
+  const [firstLoginUser, setFirstLoginUser] = useState<any>(null);
+  const [currentTempPassword, setCurrentTempPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Mouse cursor tracking for responsive background logo animation
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -74,7 +83,16 @@ export default function LoginPage() {
       });
       const data = await res.json();
 
-      if (res.ok && data.requires2Fa) {
+      if (res.ok && data.requirePasswordChange) {
+        // Intercept first login: require mandatory password change
+        setFirstLoginUser(data);
+        setCurrentTempPassword(password.trim());
+        setNewPassword('');
+        setConfirmPassword('');
+        setStep('first_login_password_change');
+        setError(null);
+        return;
+      } else if (res.ok && data.requires2Fa) {
         // When 2FA is active
         setTwoFaData(data);
         setStep('2fa');
@@ -177,6 +195,45 @@ export default function LoginPage() {
       } else {
         setError('Code à 6 chiffres invalide.');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFirstLoginPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    if (newPassword !== confirmPassword) {
+      setError('New password and confirmation do not match.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: firstLoginUser?.email || email.trim(),
+          currentPassword: currentTempPassword.trim(),
+          newPassword: newPassword.trim(),
+          confirmPassword: confirmPassword.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.user) {
+        localStorage.setItem('liec_user', JSON.stringify(data.user));
+        localStorage.setItem('liec_role', data.user.role);
+        document.cookie = `liec_user_email=${encodeURIComponent(data.user.email)}; path=/; max-age=604800; SameSite=Lax`;
+        router.push('/');
+      } else {
+        setError(data.error || 'Erreur lors du changement de mot de passe.');
+      }
+    } catch {
+      setError('Erreur réseau lors de la mise à jour du mot de passe.');
     } finally {
       setLoading(false);
     }
@@ -808,6 +865,142 @@ export default function LoginPage() {
                     <span>{loading ? 'Authenticating...' : 'Sign in'}</span>
                     <span aria-hidden="true">→</span>
                   </button>
+                </form>
+              </>
+            ) : step === 'first_login_password_change' ? (
+              <>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#d8f6ea', color: '#0c685a', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
+                  <span>🔒 MANDATORY SECURITY INITIALIZATION</span>
+                </div>
+                <h2>Create Your Personal Password</h2>
+                <p className="sub">
+                  Welcome to LIEC Heav’n, <strong>{firstLoginUser?.name || 'Staff Member'}</strong>. For security compliance, you must replace your temporary default password with a confidential personal password before accessing the workspace.
+                </p>
+
+                {error && <div className="error">{error}</div>}
+
+                <form onSubmit={handleFirstLoginPasswordChange}>
+                  <div className="field">
+                    <label htmlFor="currentTempPassword">Current Temporary Password</label>
+                    <div className="password-wrap">
+                      <input
+                        id="currentTempPassword"
+                        name="currentTempPassword"
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        placeholder="Temporary password from Administrator"
+                        value={currentTempPassword}
+                        onChange={(e) => setCurrentTempPassword(e.target.value)}
+                        required
+                      />
+                      <button
+                        className="show-pass"
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      >
+                        {showCurrentPassword ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="newPassword">New Personal Password</label>
+                    <div className="password-wrap">
+                      <input
+                        id="newPassword"
+                        name="newPassword"
+                        type={showNewPassword ? 'text' : 'password'}
+                        placeholder="Choose a strong personal password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        autoFocus
+                      />
+                      <button
+                        className="show-pass"
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                      >
+                        {showNewPassword ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="confirmPassword">Confirm New Password</label>
+                    <div className="password-wrap">
+                      <input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        placeholder="Re-enter your new password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                      />
+                      <button
+                        className="show-pass"
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      >
+                        {showConfirmPassword ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Password Security Policy Checklist */}
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', margin: '14px 0', fontSize: '11px' }}>
+                    <div style={{ fontWeight: 800, color: '#092342', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Password Security Requirements</span>
+                      <span style={{ color: newPassword.length >= 10 && /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) && /[0-9]/.test(newPassword) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(newPassword) ? '#16a34a' : '#64748b' }}>
+                        {newPassword.length >= 10 && /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) && /[0-9]/.test(newPassword) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(newPassword) ? '✓ Compliant' : 'Requirements pending'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      <div style={{ color: newPassword.length >= 10 ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
+                        {newPassword.length >= 10 ? '✓' : '○'} 10+ characters
+                      </div>
+                      <div style={{ color: /[A-Z]/.test(newPassword) ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
+                        {/[A-Z]/.test(newPassword) ? '✓' : '○'} Uppercase letter
+                      </div>
+                      <div style={{ color: /[a-z]/.test(newPassword) ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
+                        {/[a-z]/.test(newPassword) ? '✓' : '○'} Lowercase letter
+                      </div>
+                      <div style={{ color: /[0-9]/.test(newPassword) ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
+                        {/[0-9]/.test(newPassword) ? '✓' : '○'} Number (0-9)
+                      </div>
+                      <div style={{ color: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(newPassword) ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
+                        {/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(newPassword) ? '✓' : '○'} Special symbol (!@#$%)
+                      </div>
+                      <div style={{ color: confirmPassword.length > 0 && newPassword === confirmPassword ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
+                        {confirmPassword.length > 0 && newPassword === confirmPassword ? '✓' : '○'} Passwords match
+                      </div>
+                    </div>
+                  </div>
+
+                  <button className="submit" type="submit" disabled={loading}>
+                    <span>{loading ? 'Securing account...' : 'Save Password & Enter Workspace'}</span>
+                    <span aria-hidden="true">→</span>
+                  </button>
+
+                  <div style={{ textAlign: 'center', marginTop: '14px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep('credentials');
+                        setError(null);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#64748b',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ← Cancel & Return to Sign in
+                    </button>
+                  </div>
                 </form>
               </>
             ) : (

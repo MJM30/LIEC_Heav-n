@@ -187,6 +187,11 @@ export default function LiecWorkspacePage() {
       });
       if (!res.ok) {
         if (res.status === 403) {
+          const errData = await res.json().catch(() => null);
+          if (errData?.requirePasswordChange) {
+            router.replace('/login?status=password_change_required');
+            return;
+          }
           showToast(isEn ? 'Access restricted by server-side RBAC policy.' : 'Accès restreint par la politique RBAC du serveur.');
         }
         return;
@@ -224,7 +229,11 @@ export default function LiecWorkspacePage() {
 
     try {
       const u = JSON.parse(savedUserStr);
-      if (!u || !u.email || !['admin', 'secretary', 'avi'].includes(u.role)) {
+      if (!u || !u.email || !['admin', 'secretary', 'avi'].includes(u.role) || u.must_change_password) {
+        if (u?.must_change_password) {
+          router.replace('/login?status=password_change_required');
+          return;
+        }
         localStorage.removeItem('liec_user');
         localStorage.removeItem('liec_role');
         setCheckingAuth(false);
