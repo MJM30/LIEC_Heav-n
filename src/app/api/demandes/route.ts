@@ -338,9 +338,10 @@ export async function PATCH(req: NextRequest) {
         `INSERT INTO candidats (
           ref, initials, full_name, avatar_url, program, cities, adviser,
           stage_badge, stage_badge_tone, progress_pct, status_left, status_right,
-          email, phone, country, nationality, current_diploma, tcf_score,
+          email, phone, parent_full_name, parent_phone, graduation_year, current_activity, final_year_university,
+          country, nationality, current_diploma, tcf_score,
           garant_info, interview_date, jalons_json, voeux_json, notes_json, pieces_json
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)`,
         [
           canRef,
           dem.initials,
@@ -356,6 +357,11 @@ export async function PATCH(req: NextRequest) {
           'Qualifié',
           dem.email,
           dem.phone,
+          dem.parent_full_name || null,
+          dem.parent_phone || null,
+          dem.graduation_year || null,
+          dem.current_activity || null,
+          dem.final_year_university || null,
           dem.city,
           dem.nationality,
           dem.current_level,
