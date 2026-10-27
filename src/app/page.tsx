@@ -1184,31 +1184,36 @@ export default function LiecWorkspacePage() {
               )}
 
               {activeTab === 'candidats' && (
-                <CandidatsScreen
-                  candidats={candidats}
-                  selectedRef={selectedCandidatRef}
-                  onSelectRef={setSelectedCandidatRef}
-                  onCreateCandidat={handleCreateCandidat}
-                  onAddNote={handleAddCandidatNote}
-                  onAddVoeu={handleAddCandidatVoeu}
-                  onAdvanceJalon={handleAdvanceCandidatJalon}
-                  onTogglePiece={handleToggleCandidatPiece}
-                  onNotify={showToast}
-                  lang={lang}
-                  aviRequests={aviRequests}
-                  accommodationRequests={accommodationRequests}
-                  currentRole={rolePreview}
-                  currentUser={currentUser}
-                  onRefresh={fetchWorkspace}
-                  onOpenAviCreation={(studentRef) => {
-                    setSelectedCandidatRef(studentRef);
-                    setActiveTab('services');
-                  }}
-                  onOpenAccommodationCreation={(studentRef) => {
-                    setSelectedCandidatRef(studentRef);
-                    setActiveTab('accommodation');
-                  }}
-                />
+                <ErrorBoundary
+                  fallbackTitle={isEn ? 'Error loading Candidate Files' : "Erreur d'affichage des Dossiers Candidats"}
+                  onReset={fetchWorkspace}
+                >
+                  <CandidatsScreen
+                    candidats={candidats}
+                    selectedRef={selectedCandidatRef}
+                    onSelectRef={setSelectedCandidatRef}
+                    onCreateCandidat={handleCreateCandidat}
+                    onAddNote={handleAddCandidatNote}
+                    onAddVoeu={handleAddCandidatVoeu}
+                    onAdvanceJalon={handleAdvanceCandidatJalon}
+                    onTogglePiece={handleToggleCandidatPiece}
+                    onNotify={showToast}
+                    lang={lang}
+                    aviRequests={aviRequests}
+                    accommodationRequests={accommodationRequests}
+                    currentRole={rolePreview}
+                    currentUser={currentUser}
+                    onRefresh={fetchWorkspace}
+                    onOpenAviCreation={(studentRef) => {
+                      setSelectedCandidatRef(studentRef);
+                      setActiveTab('services');
+                    }}
+                    onOpenAccommodationCreation={(studentRef) => {
+                      setSelectedCandidatRef(studentRef);
+                      setActiveTab('accommodation');
+                    }}
+                  />
+                </ErrorBoundary>
               )}
 
               {activeTab === 'prepa' && (
