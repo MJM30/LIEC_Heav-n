@@ -1,28 +1,85 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-email',
+  };
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders(),
+  });
+}
+
+export async function GET() {
+  try {
+    const db = await getDb();
+    const res = await db.query('SELECT * FROM candidats ORDER BY id DESC');
+    const candidats = res.rows.map((row: any) => ({
+      ...row,
+      jalons: JSON.parse(row.jalons_json || '[]'),
+      voeux: JSON.parse(row.voeux_json || '[]'),
+      notes: JSON.parse(row.notes_json || '[]'),
+      pieces: JSON.parse(row.pieces_json || '[]'),
+    }));
+    return NextResponse.json({ ok: true, candidats }, { headers: corsHeaders() });
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message }, { status: 500, headers: corsHeaders() });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const db = await getDb();
     const body = await req.json();
 
-    const fullName = (body.full_name || 'Nouveau Candidat').trim();
-    const program = (body.program || 'MyDigitalSchool Lyon — Dév. Web & UX/UI').trim();
-    const cities = (body.cities || 'Lyon (Campus Part-Dieu)').trim();
-    const adviser = (body.adviser || 'Sarah Mwamba').trim();
-    const email = (body.email || 'candidat@liec.edu').trim();
-    const phone = (body.phone || '+243 81 000 0000').trim();
+    // 1. Informations du Candidat
+    const fullName = (body.full_name || body.nom_complet || body.fullName || 'Nouveau Candidat').trim();
+    const email = (body.email || body.adresse_email || 'candidat@liec.edu').trim();
+    const phone = (body.phone || body.telephone || '+243 ').trim();
 
     // Validate Candidate Phone Number (max 14 digits)
     const phoneDigits = phone.replace(/\D/g, '');
     if (phoneDigits.length > 14) {
       return NextResponse.json(
         { error: 'Phone / WhatsApp must be limited to a maximum of 14 digits.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders() }
       );
     }
-    const country = (body.country || 'RDC (Kinshasa)').trim();
 
+    const country = (body.country || body.pays_recrutement || body.pays || '🇨🇩 RDC (Kinshasa / Lubumbashi / Goma)').trim();
+    const villeOrigine = (body.ville_origine || body.city || 'Kinshasa').trim();
+    const destination = (body.destination || 'Lyon (Exclusivement)').trim();
+
+    // 2. Informations du Parent & Famille
+    const parentName = (body.parent_name || body.parent_full_name || body.nom_parent || '').trim();
+    const parentPhone = (body.parent_phone || body.telephone_parent || '').trim();
+
+    // Validate Parent Phone Number (max 14 digits)
+    const parentPhoneDigits = parentPhone.replace(/\D/g, '');
+    if (parentPhoneDigits.length > 14) {
+      return NextResponse.json(
+        { error: 'Parent Phone Number must be limited to a maximum of 14 digits.' },
+        { status: 400, headers: corsHeaders() }
+      );
+    }
+
+    // 3. Parcours Académique & Activité
+    const anneeDiplome = (body.annee_diplome || body.graduation_year || body.annee_bac || '2024').trim();
+    const activiteActuelle = (body.activite_actuelle || body.current_activity || 'Étudiant / Stagiaire').trim();
+    const derniereAnneeUniv = (body.derniere_annee_univ || body.final_year_university || '2024').trim();
+
+    // 4. École Partenaire & Budget
+    const rawProgram = (body.program || body.ecole_partenaire || '2. MyDigitalSchool Lyon (Web dev, digital & UX/UI)').trim();
+    const budgetAnnuel = (body.budget_annuel || body.budget || '8 500 € – 10 000 € / an').trim();
+    const adviser = (body.adviser || 'Sarah Mwamba').trim();
+
+    // Safe Reference generation
     const countRes = await db.query<{ count: string | number }>('SELECT COUNT(*) as count FROM candidats');
     let nextNum = 43 + Number(countRes.rows[0]?.count ?? 0);
     let ref = `#CAN-2025-${String(nextNum).padStart(3, '0')}`;
@@ -32,38 +89,39 @@ export async function POST(req: NextRequest) {
       nextNum++;
       ref = `#CAN-2025-${String(nextNum).padStart(3, '0')}`;
     }
-    const parentFullName = (body.parent_full_name || body.parent_name || '').trim();
-    const parentPhone = (body.parent_phone || '').trim();
 
-    // Validate Parent Phone Number (max 14 digits)
-    const parentPhoneDigits = parentPhone.replace(/\D/g, '');
-    if (parentPhoneDigits.length > 14) {
-      return NextResponse.json(
-        { error: 'Parent Phone Number must be limited to a maximum of 14 digits.' },
-        { status: 400 }
-      );
-    }
-    const graduationYear = String(body.graduation_year || '').trim();
-    const currentActivity = (body.current_activity || '').trim();
-    const finalYearUniversity = (body.final_year_university || '').trim();
     const parts = fullName.split(/\s+/);
     const initials =
       parts.length >= 2
         ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
         : fullName.slice(0, 2).toUpperCase();
 
-    const schoolName = program.split('—')[0]?.trim() || 'MyDigitalSchool Lyon';
-    const schoolCode = schoolName.includes('ISCOM')
-      ? 'ISCO'
-      : schoolName.includes('Tunon')
-      ? 'TUNO'
-      : schoolName.includes('IHECF')
-      ? 'IHEC'
-      : schoolName.includes('Ipac')
-      ? 'IPAC'
-      : schoolName.includes('MBway')
-      ? 'MBW'
-      : 'MDS';
+    // Clean school name
+    let schoolName = 'MyDigitalSchool Lyon';
+    let schoolCode = 'MDS';
+    if (rawProgram.includes('ISCOM')) {
+      schoolName = 'ISCOM Lyon';
+      schoolCode = 'ISCO';
+    } else if (rawProgram.includes('Tunon')) {
+      schoolName = 'École Internationale Tunon Lyon';
+      schoolCode = 'TUNO';
+    } else if (rawProgram.includes('IHECF')) {
+      schoolName = 'IHECF Lyon';
+      schoolCode = 'IHEC';
+    } else if (rawProgram.includes('Ipac')) {
+      schoolName = 'Ipac Bachelor Factory Lyon';
+      schoolCode = 'IPAC';
+    } else if (rawProgram.includes('MBway')) {
+      schoolName = 'MBway Lyon';
+      schoolCode = 'MBW';
+    } else if (rawProgram.includes('MyDigitalSchool')) {
+      schoolName = 'MyDigitalSchool Lyon';
+      schoolCode = 'MDS';
+    }
+
+    const currentDiploma = `Diplôme: ${anneeDiplome} • Univ: ${derniereAnneeUniv} • Activité: ${activiteActuelle}`;
+    const garantInfo = `Parent: ${parentName || 'Famille'} (${parentPhone || phone}) • Budget: ${budgetAnnuel}`;
+    const citiesFormatted = `${villeOrigine} ➔ ${destination}`;
 
     const jalons = [
       {
@@ -72,35 +130,35 @@ export async function POST(req: NextRequest) {
         title: 'Orientation & Ciblage',
         status: 'EN COURS',
         tone: 'active',
-        description: `Sélection de l'école partenaire à Lyon (${schoolName}) en cours avec ${adviser}.`,
-        footer: 'École partenaire Lyon',
+        description: `Dossier de candidature initialisé pour ${schoolName}. Sélection des spécialités en cours.`,
+        footer: 'Session 2027-2028',
       },
       {
         num: 2,
         label: 'JALON 2',
-        title: 'Pièces Académiques',
-        status: 'À VENIR',
+        title: 'Dossier Académique',
+        status: 'EN ATTENTE',
         tone: 'upcoming',
-        description: 'Collecte et certification des relevés de notes et test de langue TCF.',
-        footer: '2 / 10 documents validés',
+        description: `Vérification des diplômes (${anneeDiplome}) et relevés universitaires (${derniereAnneeUniv}).`,
+        footer: 'Pièces requises',
       },
       {
         num: 3,
         label: 'JALON 3',
-        title: 'Dépôt Officiel',
-        status: 'ATTENTE',
-        tone: 'pending',
-        description: `Soumission Campus France (${country}) & portail d'admission ${schoolName}.`,
-        footer: 'Échéance : 15 Décembre',
+        title: 'Soumission Officielle',
+        status: 'À VENIR',
+        tone: 'upcoming',
+        description: `Entretien d'admission et transmission officielle du dossier à ${schoolName}.`,
+        footer: 'Session Lyon',
       },
       {
         num: 4,
         label: 'JALON 4',
         title: 'Visa & Installation',
-        status: 'ATTENTE',
-        tone: 'pending',
-        description: 'Garant financier, attestation bancaire AVI et réservation logement à Lyon.',
-        footer: 'Dès réception des avis',
+        status: 'À VENIR',
+        tone: 'upcoming',
+        description: `Préparation du compte bloqué AVI YIMMILINE (${budgetAnnuel}) et procédure consulaire.`,
+        footer: 'Guichet AVI',
       },
     ];
 
@@ -109,30 +167,33 @@ export async function POST(req: NextRequest) {
         code: schoolCode,
         codeBg: 'navy',
         university: schoolName,
-        rankBadge: 'Vœu n°1',
+        rankBadge: 'Vœu #1 (Prioritaire)',
         rankTone: 'mint',
-        program,
-        location: 'Campus Lyon',
-        meta: 'École Partenaire LIEC Lyon',
-        statusBadge: 'En préparation',
-        statusTone: 'gold',
-        statusSub: `Suivi par ${adviser}`,
+        program: rawProgram,
+        location: destination,
+        meta: 'École Partenaire Officielle LIEC Lyon',
+        statusBadge: 'Nouveau Dossier',
+        statusTone: 'green',
+        statusSub: "Transmis aujourd'hui",
       },
     ];
 
     const notes = [
       {
-        author: adviser,
+        author: 'Portail Web LIEC-France Prépa',
         date: "Aujourd'hui",
-        text: `Ouverture du dossier pédagogique LIEC Lyon (${schoolName}) pour ${fullName} (${country}).`,
+        text: `Candidature reçue en direct via le formulaire officiel ENROLLMENT FORM • 2027-2028.\n• Candidat : ${fullName} (${email} / ${phone})\n• Recrutement : ${country} (Origine : ${villeOrigine})\n• Parent & Famille : ${parentName || 'Non renseigné'} (${parentPhone || 'Non renseigné'})\n• Parcours : Diplôme ${anneeDiplome} | Univ ${derniereAnneeUniv} | Activité : ${activiteActuelle}\n• École partenaire : ${rawProgram}\n• Budget annuel garanti : ${budgetAnnuel}`,
       },
     ];
 
     const pieces = [
-      { name: `Passeport biométrique (${country})`, meta: 'Vérifié', status: 'valid' },
-      { name: `Lettre de motivation ${schoolName}`, meta: 'En rédaction', status: 'pending' },
+      { name: `Passeport / Pièce d'identité (${country})`, meta: 'À vérifier', status: 'pending' },
+      { name: `Diplôme certifié (${anneeDiplome})`, meta: 'En attente', status: 'pending' },
+      { name: `Accord de prise en charge parentale (${parentName || 'Famille'})`, meta: budgetAnnuel, status: 'pending' },
+      { name: `Dossier de candidature ${schoolName}`, meta: 'Créé', status: 'valid' },
     ];
 
+    // 1. Insert into candidats
     await db.query(
       `INSERT INTO candidats (
         ref, initials, full_name, avatar_url, program, cities, adviser,
@@ -146,26 +207,26 @@ export async function POST(req: NextRequest) {
         initials,
         fullName,
         '',
-        program,
-        cities,
+        rawProgram,
+        citiesFormatted,
         adviser,
-        'Jalon 1',
+        'Jalon 1 (PREPA)',
         'teal',
         25,
         'Dossier à 25%',
         'J-30 CF',
         email,
         phone,
-        parentFullName || null,
+        parentName || null,
         parentPhone || null,
-        graduationYear || null,
-        currentActivity || null,
-        finalYearUniversity || null,
+        anneeDiplome || null,
+        activiteActuelle || null,
+        derniereAnneeUniv || null,
         country,
-        country,
-        'Licence / Bac+3 (En cours)',
+        country.includes('RDC') ? 'Congolaise (RDC)' : country.includes('Congo') ? 'Congolaise (Brazzaville)' : 'Internationale',
+        currentDiploma,
         'Inscription TCF en cours',
-        'Dossier AVI YIMMILINE à initier',
+        garantInfo,
         '15 Novembre 2025',
         JSON.stringify(jalons),
         JSON.stringify(voeux),
@@ -174,120 +235,103 @@ export async function POST(req: NextRequest) {
       ]
     );
 
-    if (parentFullName && fullName) {
-      await db.query(
-        `INSERT INTO parent_student_links (parent_name, parent_phone, student_name, student_email, student_program, source)
-         VALUES ($1, $2, $3, $4, $5, 'candidate')
-         ON CONFLICT (parent_name, student_name) DO UPDATE SET
-           parent_phone = COALESCE(EXCLUDED.parent_phone, parent_student_links.parent_phone),
-           student_program = COALESCE(EXCLUDED.student_program, parent_student_links.student_program)`,
-        [parentFullName, parentPhone, fullName, email, program]
-      );
+    // Optional parent_student_links check
+    try {
+      if (parentName && fullName) {
+        await db.query(
+          `INSERT INTO parent_student_links (parent_name, parent_phone, student_name, student_email, student_program, source)
+           VALUES ($1, $2, $3, $4, $5, 'candidate')
+           ON CONFLICT (parent_name, student_name) DO UPDATE SET
+             parent_phone = COALESCE(EXCLUDED.parent_phone, parent_student_links.parent_phone),
+             student_program = COALESCE(EXCLUDED.student_program, parent_student_links.student_program)`,
+          [parentName, parentPhone, fullName, email, rawProgram]
+        );
+      }
+    } catch {
+      // Table may not exist in all environments, safe to ignore
     }
 
+    // 2. Also register in demandes table so it synchronizes across all dashboard views
+    const countDemRes = await db.query<{ count: string | number }>('SELECT COUNT(*) as count FROM demandes');
+    let nextDemNum = 90 + Number(countDemRes.rows[0]?.count ?? 0);
+    let demRef = `#DEM-2025-${String(nextDemNum).padStart(3, '0')}`;
+    while (true) {
+      const existingDem = await db.query('SELECT 1 FROM demandes WHERE ref = $1', [demRef]);
+      if (existingDem.rowCount === 0) break;
+      nextDemNum++;
+      demRef = `#DEM-2025-${String(nextDemNum).padStart(3, '0')}`;
+    }
+    const countryFlag = country.includes('🇨🇬') ? '🇨🇬' : country.includes('🇨🇲') ? '🇨🇲' : '🇨🇩';
+
+    await db.query(
+      `INSERT INTO demandes (
+        ref, initials, full_name, email, phone, whatsapp_verified,
+        country_code, flag, country_name, city, nationality,
+        program, service_pole, target_cities, current_level, budget_range,
+        status, adviser, expected_start, message, submitted_at, is_dashboard_recent
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+      ON CONFLICT (ref) DO NOTHING`,
+      [
+        demRef,
+        initials,
+        fullName,
+        email,
+        phone,
+        true,
+        'CD',
+        countryFlag,
+        country,
+        `${villeOrigine}, ${country}`,
+        'Congolaise',
+        rawProgram,
+        `PREPA / ${schoolName}`,
+        'Lyon (Exclusif)',
+        `Diplôme ${anneeDiplome} • ${activiteActuelle}`,
+        budgetAnnuel,
+        'Nouvelle',
+        adviser,
+        'Rentrée 2027-2028',
+        `Inscription en ligne LIEC - France Prépa (2027-2028). Parent: ${parentName} (${parentPhone}). Univ: ${derniereAnneeUniv}. Budget garanti: ${budgetAnnuel}.`,
+        "Soumis à l'instant via le portail web",
+        true,
+      ]
+    );
+
+    // 3. Register priority task for advisors
+    await db.query(
+      `INSERT INTO priority_tasks (title, description, priority, action_label, target_module, completed, role_queue)
+       VALUES ($1, $2, 'Urgent', 'Consulter Dossier Candidat', 'candidats', FALSE, 'all')`,
+      [
+        `Nouveau candidat PREPA 2027-2028 : ${fullName}`,
+        `${schoolName} • Ville: ${villeOrigine} • Parent: ${parentName || 'Famille'} (${parentPhone || phone})`,
+      ]
+    );
+
+    // 4. Audit log entry
     await db.query(
       `INSERT INTO audit_logs (actor, action, entity_ref, outcome)
        VALUES ($1, $2, $3, 'Succès')`,
-      [adviser, `Création nouveau candidat Lyon (${fullName})`, ref]
+      ['Portail Web Public', `Candidature PREPA reçue : ${fullName} (${ref})`, ref]
     );
 
-    return NextResponse.json({ ok: true, ref });
+    return NextResponse.json(
+      {
+        ok: true,
+        success: true,
+        ref,
+        demRef,
+        fullName,
+        program: rawProgram,
+        schoolName,
+        message: 'Candidature enregistrée avec succès dans le Dashboard LIEC-ONE',
+      },
+      { headers: corsHeaders() }
+    );
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message }, { status: 500 });
-  }
-}
-
-export async function PATCH(req: NextRequest) {
-  try {
-    const db = await getDb();
-    const body = await req.json();
-    const { ref, action } = body;
-
-    const res = await db.query('SELECT * FROM candidats WHERE ref = $1', [ref]);
-    const cand = res.rows[0];
-    if (!cand) {
-      return NextResponse.json({ error: 'Candidat introuvable' }, { status: 404 });
-    }
-
-    if (action === 'add_note') {
-      const notes = JSON.parse(cand.notes_json || '[]');
-      const newNote = {
-        author: body.author || 'Sarah Mwamba',
-        date: "Aujourd'hui, à l'instant",
-        text: (body.text || '').trim(),
-      };
-      notes.unshift(newNote);
-      await db.query('UPDATE candidats SET notes_json = $1 WHERE ref = $2', [
-        JSON.stringify(notes),
-        ref,
-      ]);
-      await db.query(
-        `INSERT INTO audit_logs (actor, action, entity_ref, outcome)
-         VALUES ($1, 'Ajout note pédagogique dossier candidat', $2, 'Succès')`,
-        [newNote.author, ref]
-      );
-      return NextResponse.json({ ok: true, notes });
-    }
-
-    if (action === 'add_voeu') {
-      const voeux = JSON.parse(cand.voeux_json || '[]');
-      const newVoeu = {
-        code: (body.code || 'MDS').slice(0, 4).toUpperCase(),
-        codeBg: voeux.length % 2 === 0 ? 'navy' : 'teal',
-        university: body.university || 'MyDigitalSchool Lyon',
-        rankBadge: `Vœu n°${voeux.length + 1}`,
-        rankTone: voeux.length === 0 ? 'mint' : 'neutral',
-        program: body.program || cand.program,
-        location: body.location || 'Campus Lyon',
-        meta: body.meta || 'École Partenaire LIEC Lyon',
-        statusBadge: 'Cible Ajoutée',
-        statusTone: 'green',
-        statusSub: 'Validé par comité LIEC Lyon',
-      };
-      voeux.push(newVoeu);
-      await db.query('UPDATE candidats SET voeux_json = $1 WHERE ref = $2', [
-        JSON.stringify(voeux),
-        ref,
-      ]);
-      return NextResponse.json({ ok: true, voeux });
-    }
-
-    if (action === 'advance_jalon') {
-      const jalonNum = Number(body.jalonNum);
-      const jalons = JSON.parse(cand.jalons_json || '[]').map((j: any) => {
-        if (j.num < jalonNum) {
-          return { ...j, status: 'VALIDÉ', tone: 'done' };
-        }
-        if (j.num === jalonNum) {
-          return { ...j, status: 'EN COURS', tone: 'active' };
-        }
-        return { ...j, status: 'À VENIR', tone: 'upcoming' };
-      });
-      const pctMap: Record<number, number> = { 1: 30, 2: 62, 3: 85, 4: 96 };
-      const nextPct = pctMap[jalonNum] || cand.progress_pct;
-      await db.query(
-        'UPDATE candidats SET jalons_json = $1, progress_pct = $2, stage_badge = $3 WHERE ref = $4',
-        [JSON.stringify(jalons), nextPct, `En cours (Jalon ${jalonNum})`, ref]
-      );
-      return NextResponse.json({ ok: true, jalons, progress_pct: nextPct });
-    }
-
-    if (action === 'toggle_piece') {
-      const index = Number(body.index);
-      const pieces = JSON.parse(cand.pieces_json || '[]');
-      if (pieces[index]) {
-        pieces[index].status = pieces[index].status === 'valid' ? 'pending' : 'valid';
-        pieces[index].meta = pieces[index].status === 'valid' ? 'Certifié' : 'En révision';
-      }
-      await db.query('UPDATE candidats SET pieces_json = $1 WHERE ref = $2', [
-        JSON.stringify(pieces),
-        ref,
-      ]);
-      return NextResponse.json({ ok: true, pieces });
-    }
-
-    return NextResponse.json({ error: 'Action non supportée' }, { status: 400 });
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message }, { status: 500 });
+    console.error('Error creating candidat:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Erreur lors de la création du candidat' },
+      { status: 500, headers: corsHeaders() }
+    );
   }
 }
