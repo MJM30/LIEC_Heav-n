@@ -76,6 +76,7 @@ export interface AuthenticatedUserContext {
   name: string;
   email: string;
   business_profile: BusinessProfile;
+  role?: string;
   technical_roles: TechnicalRole[];
   title: string;
   initials: string;

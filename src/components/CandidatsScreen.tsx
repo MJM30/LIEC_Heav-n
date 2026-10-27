@@ -18,6 +18,7 @@ import {
   FileText,
   Clock,
   PlusCircle,
+  Plus,
   Euro,
   ShieldCheck,
   Wrench,
@@ -66,7 +67,7 @@ interface CandidatsScreenProps {
 }
 
 export default function CandidatsScreen({
-  candidats,
+  candidats = [],
   selectedRef,
   onSelectRef,
   onCreateCandidat,
@@ -139,19 +140,22 @@ export default function CandidatsScreen({
   const [voeuProg, setVoeuProg] = useState('Communication, advertising, marketing and events');
   const [voeuCode, setVoeuCode] = useState('ISCO');
 
-  const filteredCandidats = candidats.filter((c) => {
+  const safeCandidats = Array.isArray(candidats) ? candidats : [];
+
+  const filteredCandidats = safeCandidats.filter((c) => {
+    if (!c) return false;
     const q = cohortFilter.toLowerCase().trim();
     if (!q) return true;
     return (
-      c.ref.toLowerCase().includes(q) ||
-      c.full_name.toLowerCase().includes(q) ||
-      c.program.toLowerCase().includes(q) ||
-      c.country.toLowerCase().includes(q)
+      (c.ref || '').toLowerCase().includes(q) ||
+      (c.full_name || '').toLowerCase().includes(q) ||
+      (c.program || '').toLowerCase().includes(q) ||
+      (c.country || '').toLowerCase().includes(q)
     );
   });
 
   const selectedCandidat =
-    candidats.find((c) => c.ref === selectedRef) || filteredCandidats[0] || candidats[0];
+    safeCandidats.find((c) => c.ref === selectedRef) || filteredCandidats[0] || safeCandidats[0];
 
   // Sync form state when selectedCandidat changes
   useEffect(() => {
@@ -383,7 +387,106 @@ export default function CandidatsScreen({
     setShowNewCandidatModal(false);
   };
 
-  if (!selectedCandidat) return null;
+  if (!selectedCandidat) {
+    return (
+      <div className="space-y-5">
+        <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-[#0c685a] mb-1">
+              <span className="h-2 w-2 rounded-full bg-[#0c685a]" />
+              <span>LIEC HEAV’N • STUDENT RECORD MANAGEMENT</span>
+            </div>
+            <h1 className="text-[26px] sm:text-[30px] font-extrabold tracking-tight text-[#092342] leading-[1.15]">
+              Centralised Student Record
+            </h1>
+            <p className="mt-1 text-xs text-slate-500 max-w-lg">
+              ServiceNow Incident-inspired unified record, tracking personal data, activity stream, and linked secondary requests.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => setShowNewCandidatModal(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#092342] hover:bg-[#12365a] px-4 py-2 text-xs font-extrabold text-white shadow-sm transition"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>+ New Student Record</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-12 text-center text-slate-500 bg-white rounded-2xl border border-slate-200 space-y-3">
+          <Users className="w-12 h-12 text-slate-300 mx-auto" />
+          <h3 className="text-base font-bold text-slate-800">
+            {isEn ? 'No Student Records Available' : 'Aucun dossier étudiant disponible'}
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            {isEn
+              ? 'No applicant or student records matched your search query or exist in the workspace database.'
+              : 'Aucun dossier de candidat ne correspond à votre recherche ou n’existe dans la base de données.'}
+          </p>
+          <button
+            onClick={() => setShowNewCandidatModal(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-xs font-bold text-white shadow-sm"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>+ Create Student Record</span>
+          </button>
+        </div>
+
+        {/* CREATE NEW CANDIDAT MODAL */}
+        {showNewCandidatModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+            <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4 my-8 text-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="w-4 h-4 text-indigo-600" />
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {isEn ? 'Record a New Student Record' : 'Créer un Nouveau Candidat'}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowNewCandidatModal(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  ✕
+                </button>
+              </div>
+              <form onSubmit={handleCreateCandSubmit} className="space-y-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    {isEn ? 'Student Full Name *' : 'Nom et Prénom *'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newCandName}
+                    onChange={(e) => setNewCandName(e.target.value)}
+                    placeholder="e.g. Dieudonné KABANGELE"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900"
+                  />
+                </div>
+                <div className="pt-3 flex justify-end gap-2 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewCandidatModal(false)}
+                    className="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 font-bold shadow"
+                  >
+                    Create Student Record
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

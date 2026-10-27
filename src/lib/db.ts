@@ -1638,8 +1638,8 @@ async function createDBClient(): Promise<DBClient> {
   const pgliteClient: DBClient = {
     engine: 'pglite',
     async query<T = any>(sql: string, params?: any[]): Promise<QueryResult<T>> {
-      const res = await pglite.query<T>(sql, params);
-      return { rows: res.rows, rowCount: res.affectedRows ?? res.rows.length };
+      const res = await (pglite as any).query(sql, params);
+      return { rows: res.rows as T[], rowCount: res.affectedRows ?? res.rows.length };
     },
     async exec(sql: string): Promise<void> {
       await pglite.exec(sql);
