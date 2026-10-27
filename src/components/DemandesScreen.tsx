@@ -33,32 +33,32 @@ import {
 import { Lang } from './ServicesAndOtherScreens';
 
 interface DemandesScreenProps {
-  demandes: any[];
-  demandeNotes: any[];
-  selectedRef: string;
-  onSelectRef: (ref: string) => void;
-  onOpenNewDemande: () => void;
-  onAddNote: (ref: string, content: string) => Promise<void>;
-  onUpdateStatus: (ref: string, status: string, adviser?: string) => Promise<void>;
-  onConvertCandidat: (ref: string) => Promise<void>;
-  onArchiveDemande: (ref: string) => Promise<void>;
-  onRefresh: () => void;
-  onNotify: (msg: string) => void;
+  demandes?: any[];
+  demandeNotes?: any[];
+  selectedRef?: string;
+  onSelectRef?: (ref: string) => void;
+  onOpenNewDemande?: () => void;
+  onAddNote?: (ref: string, content: string) => Promise<void>;
+  onUpdateStatus?: (ref: string, status: string, adviser?: string) => Promise<void>;
+  onConvertCandidat?: (ref: string) => Promise<void>;
+  onArchiveDemande?: (ref: string) => Promise<void>;
+  onRefresh?: () => void;
+  onNotify?: (msg: string) => void;
   lang?: Lang;
 }
 
 export default function DemandesScreen({
-  demandes,
-  demandeNotes,
-  selectedRef,
-  onSelectRef,
-  onOpenNewDemande,
-  onAddNote,
-  onUpdateStatus,
-  onConvertCandidat,
-  onArchiveDemande,
-  onRefresh,
-  onNotify,
+  demandes = [],
+  demandeNotes = [],
+  selectedRef = '',
+  onSelectRef = () => {},
+  onOpenNewDemande = () => {},
+  onAddNote = async () => {},
+  onUpdateStatus = async () => {},
+  onConvertCandidat = async () => {},
+  onArchiveDemande = async () => {},
+  onRefresh = () => {},
+  onNotify = () => {},
   lang = 'en',
 }: DemandesScreenProps) {
   const isEn = lang === 'en';
@@ -72,50 +72,69 @@ export default function DemandesScreen({
   const [converting, setConverting] = useState(false);
   const [page, setPage] = useState(1);
 
+  // Safe normalization of dataset
+  const safeDemandes = Array.isArray(demandes) ? demandes.filter(Boolean) : [];
+  const safeNotes = Array.isArray(demandeNotes) ? demandeNotes.filter(Boolean) : [];
+
   // Main Demandes queue
   const orderedDemandes = [
-    ...demandes.filter((d) => !d.is_dashboard_recent || d.submitted_at?.includes('Just now')),
-    ...demandes.filter((d) => d.is_dashboard_recent && !d.submitted_at?.includes('Just now')),
+    ...safeDemandes.filter((d) => !d.is_dashboard_recent || String(d.submitted_at || '').includes('Just now')),
+    ...safeDemandes.filter((d) => d.is_dashboard_recent && !String(d.submitted_at || '').includes('Just now')),
   ];
 
   const filteredList = orderedDemandes.filter((d) => {
+    if (!d) return false;
     const q = searchQuery.toLowerCase().trim();
+    const refStr = String(d.ref || '').toLowerCase();
+    const nameStr = String(d.full_name || '').toLowerCase();
+    const emailStr = String(d.email || '').toLowerCase();
+    const phoneStr = String(d.phone || '').toLowerCase();
+
     const matchSearch =
       !q ||
-      d.ref.toLowerCase().includes(q) ||
-      d.full_name.toLowerCase().includes(q) ||
-      d.email.toLowerCase().includes(q) ||
-      d.phone.toLowerCase().includes(q);
+      refStr.includes(q) ||
+      nameStr.includes(q) ||
+      emailStr.includes(q) ||
+      phoneStr.includes(q);
 
+    const countryCode = String(d.country_code || '');
+    const countryName = String(d.country_name || '');
     const matchCountry =
       countryFilter === 'All (DRC & Congo-Brazzaville)' ||
-      (countryFilter === 'DRC' && (d.country_code === 'CD' || d.country_name?.includes('RDC') || d.country_name?.includes('DRC'))) ||
-      (countryFilter === 'Congo' && (d.country_code === 'CG' || d.country_name?.includes('Congo')));
+      (countryFilter === 'DRC' && (countryCode === 'CD' || countryName.includes('RDC') || countryName.includes('DRC'))) ||
+      (countryFilter === 'Congo' && (countryCode === 'CG' || countryName.includes('Congo')));
 
+    const progStr = String(d.program || '').toLowerCase();
+    const poleStr = String(d.service_pole || '').toLowerCase();
+    const sFilter = serviceFilter.toLowerCase();
     const matchService =
       serviceFilter === 'All 6 Lyon Partner Schools' ||
-      d.program.toLowerCase().includes(serviceFilter.toLowerCase()) ||
-      d.service_pole.toLowerCase().includes(serviceFilter.toLowerCase());
+      progStr.includes(sFilter) ||
+      poleStr.includes(sFilter);
 
+    const dStatus = String(d.status || '');
     const matchStatus =
       statusFilter === 'All' ||
       statusFilter === 'Toutes' ||
-      d.status === statusFilter ||
-      (statusFilter === 'New' && (d.status === 'New' || d.status === 'Nouvelle')) ||
-      (statusFilter === 'To Contact' && (d.status === 'To Contact' || d.status === 'À contacter')) ||
-      (statusFilter === 'In Progress' && (d.status === 'In Progress' || d.status === 'En cours')) ||
-      (statusFilter === 'Awaiting Info' && (d.status === 'Awaiting Info' || d.status === 'Attente infos')) ||
-      (statusFilter === 'Qualified' && (d.status === 'Qualified' || d.status === 'Qualifiée')) ||
-      (statusFilter === 'Converted' && (d.status === 'Converted' || d.status === 'Convertie'));
+      dStatus === statusFilter ||
+      (statusFilter === 'New' && (dStatus === 'New' || dStatus === 'Nouvelle')) ||
+      (statusFilter === 'To Contact' && (dStatus === 'To Contact' || dStatus === 'À contacter')) ||
+      (statusFilter === 'In Progress' && (dStatus === 'In Progress' || dStatus === 'En cours')) ||
+      (statusFilter === 'Awaiting Info' && (dStatus === 'Awaiting Info' || dStatus === 'Attente infos')) ||
+      (statusFilter === 'Qualified' && (dStatus === 'Qualified' || dStatus === 'Qualifiée')) ||
+      (statusFilter === 'Converted' && (dStatus === 'Converted' || dStatus === 'Convertie'));
 
     return matchSearch && matchCountry && matchService && matchStatus;
   });
 
   const selectedDemande =
-    orderedDemandes.find((d) => d.ref === selectedRef) || filteredList[0] || orderedDemandes[0];
+    orderedDemandes.find((d) => d && d.ref === selectedRef) ||
+    filteredList[0] ||
+    orderedDemandes[0] ||
+    null;
 
-  const selectedNotes = demandeNotes.filter(
-    (n) => n.demande_ref === (selectedDemande?.ref || '#DEM-2025-089')
+  const selectedNotes = safeNotes.filter(
+    (n) => n && selectedDemande && n.demande_ref === selectedDemande.ref
   );
 
   const toggleCheckbox = (ref: string) => {
@@ -151,7 +170,7 @@ export default function DemandesScreen({
     const headers = ['Reference,Name,Email,Phone,City,Program,ServicePole,Status'];
     const rows = filteredList.map(
       (d) =>
-        `"${d.ref}","${d.full_name}","${d.email}","${d.phone}","${d.city}","${d.program}","${d.service_pole}","${d.status}"`
+        `"${d?.ref || ''}","${d?.full_name || ''}","${d?.email || ''}","${d?.phone || ''}","${d?.city || ''}","${d?.program || ''}","${d?.service_pole || ''}","${d?.status || ''}"`
     );
     const blob = new Blob([headers.concat(rows).join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -164,7 +183,8 @@ export default function DemandesScreen({
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    const s = String(status || '');
+    switch (s) {
       case 'New':
       case 'Nouvelle':
         return (
@@ -217,11 +237,14 @@ export default function DemandesScreen({
         return (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[10.5px] font-bold text-slate-600">
             <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-            {status}
+            {s || 'Inconnu'}
           </span>
         );
     }
   };
+
+  const totalCount = 90 + Math.max(0, safeDemandes.length - 11);
+  const newCount = 14 + Math.max(0, safeDemandes.length - 11);
 
   return (
     <div className="space-y-5">
@@ -230,14 +253,16 @@ export default function DemandesScreen({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-[28px] font-extrabold tracking-tight text-[#092342]">
-              Received Applications
+              {isEn ? 'Received Applications' : 'Demandes reçues'}
             </h1>
             <span className="rounded-full bg-[#e6f0fa] px-3 py-1 text-xs font-extrabold text-[#092342]">
-              {90 + Math.max(0, demandes.length - 11)} Total
+              {totalCount} Total
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-            Centralize, qualify, and process university applications submitted via the public LIEC website.
+            {isEn
+              ? 'Centralize, qualify, and process university applications submitted via the public LIEC website.'
+              : 'Centralisez, qualifiez et traitez les candidatures universitaires soumises via le site public LIEC.'}
           </p>
         </div>
 
@@ -278,9 +303,7 @@ export default function DemandesScreen({
             <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
               NEW IN 24H
             </span>
-            <div className="mt-1 text-2xl font-extrabold text-[#092342]">
-              {14 + Math.max(0, demandes.length - 11)}
-            </div>
+            <div className="mt-1 text-2xl font-extrabold text-[#092342]">{newCount}</div>
           </div>
           <span className="h-11 w-11 rounded-xl bg-[#d8f6ea] text-[#0c685a] flex items-center justify-center">
             <Inbox className="w-5 h-5" />
@@ -333,7 +356,7 @@ export default function DemandesScreen({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, email, phone number..."
+              placeholder={isEn ? 'Search by name, email, phone number...' : 'Rechercher par nom, email, téléphone...'}
               className="w-full rounded-xl bg-[#f1f6fb] pl-10 pr-4 py-2.5 text-xs font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0c685a]/20"
             />
           </div>
@@ -348,7 +371,7 @@ export default function DemandesScreen({
                 className="bg-transparent font-extrabold text-[#092342] focus:outline-none cursor-pointer"
               >
                 <option value="All (DRC & Congo-Brazzaville)">
-                  All (DRC & Congo-Brazzaville)
+                  All (DRC &amp; Congo-Brazzaville)
                 </option>
                 <option value="DRC">🇨🇩 DRC (Kinshasa / Lubumbashi / Goma)</option>
                 <option value="Congo">🇨🇬 Congo-Brazzaville (Brazzaville / Pointe-Noire)</option>
@@ -398,10 +421,10 @@ export default function DemandesScreen({
         {/* Status Filter Pills */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
           {[
-            { label: 'All', count: 90 + Math.max(0, demandes.length - 11), dot: '' },
+            { label: 'All', count: totalCount, dot: '' },
             {
               label: 'New',
-              count: 14 + Math.max(0, demandes.length - 11),
+              count: newCount,
               dot: 'bg-[#0c685a]',
             },
             { label: 'To Contact', count: 12, dot: 'bg-[#f59e0b]' },
@@ -450,21 +473,21 @@ export default function DemandesScreen({
                 type="checkbox"
                 checked={checkedRefs.length > 0}
                 onChange={() =>
-                  setCheckedRefs(checkedRefs.length > 0 ? [] : [selectedDemande?.ref])
+                  setCheckedRefs(checkedRefs.length > 0 ? [] : (selectedDemande?.ref ? [selectedDemande.ref] : []))
                 }
                 className="h-4 w-4 rounded border-slate-300 text-[#092342] focus:ring-[#092342] cursor-pointer"
               />
               <span className="font-extrabold text-[#092342]">
                 {checkedRefs.length} selected
               </span>
-              <span className="text-slate-500">of 90 leads</span>
+              <span className="text-slate-500">of {totalCount} leads</span>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
                   if (selectedDemande) {
-                    onUpdateStatus(selectedDemande.ref, selectedDemande.status, 'Sarah Mwamba');
+                    onUpdateStatus(selectedDemande.ref, selectedDemande.status || 'New', 'Sarah Mwamba');
                     onNotify(`Advisor Sarah Mwamba assigned to ${selectedDemande.ref}.`);
                   }
                 }}
@@ -509,7 +532,7 @@ export default function DemandesScreen({
                 <tr className="border-b border-slate-100 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 bg-white">
                   <th className="py-3.5 pl-4 pr-2 w-8" />
                   <th className="py-3.5 px-2.5">REFERENCE</th>
-                  <th className="py-3.5 px-2.5">CANDIDATE & CONTACT</th>
+                  <th className="py-3.5 px-2.5">CANDIDATE &amp; CONTACT</th>
                   <th className="py-3.5 px-2.5">COUNTRY</th>
                   <th className="py-3.5 px-2.5">
                     LEVEL /
@@ -521,6 +544,7 @@ export default function DemandesScreen({
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredList.slice(0, 7).map((dem, i) => {
+                  if (!dem) return null;
                   const isSelected = selectedDemande?.ref === dem.ref;
                   const isChecked = checkedRefs.includes(dem.ref);
 
@@ -534,9 +558,13 @@ export default function DemandesScreen({
                     'bg-[#dbeafe] text-[#1e3a8a]',
                   ];
 
+                  const refParts = String(dem.ref || '')
+                    .replace(/-[A-Z]$/, '')
+                    .split('-');
+
                   return (
                     <tr
-                      key={dem.ref}
+                      key={dem.ref || `demande-${i}`}
                       onClick={() => onSelectRef(dem.ref)}
                       className={`cursor-pointer transition ${
                         isSelected ? 'bg-[#f1f7fd]' : 'hover:bg-slate-50/80'
@@ -557,7 +585,7 @@ export default function DemandesScreen({
                         />
                       </td>
                       <td className="py-4 px-2.5 font-extrabold text-[#092342] text-[11px] leading-tight">
-                        {dem.ref.replace(/-[A-Z]$/, '').split('-').map((p: string, idx: number) => (
+                        {refParts.map((p: string, idx: number) => (
                           <span key={idx} className="block">
                             {idx < 2 ? `${p}-` : p}
                           </span>
@@ -570,38 +598,46 @@ export default function DemandesScreen({
                               avatarColors[i % avatarColors.length]
                             }`}
                           >
-                            {dem.initials}
+                            {dem.initials || '??'}
                           </span>
                           <div className="min-w-0">
                             <div className="font-extrabold text-[#092342] truncate">
-                              {dem.full_name}
+                              {dem.full_name || 'Sans nom'}
                             </div>
-                            <div className="text-[11px] text-slate-500 truncate">{dem.email}</div>
+                            <div className="text-[11px] text-slate-500 truncate">{dem.email || '-'}</div>
                           </div>
                         </div>
                       </td>
                       <td className="py-4 px-2.5">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px] font-extrabold text-slate-500">
-                            {dem.country_code}
+                            {dem.country_code || 'CD'}
                           </span>
                           <span className="text-[11.5px] text-slate-600 leading-tight">
-                            {dem.city}
+                            {dem.city || '-'}
                           </span>
                         </div>
                       </td>
                       <td className="py-4 px-2.5">
                         <div className="font-extrabold text-[#092342] leading-tight">
-                          {dem.program}
+                          {dem.program || '-'}
                         </div>
                         <div className="mt-0.5 text-[11px] font-bold text-[#0c685a]">
-                          {dem.service_pole}
+                          {dem.service_pole || '-'}
                         </div>
                       </td>
                       <td className="py-4 px-3">{getStatusBadge(dem.status)}</td>
                     </tr>
                   );
                 })}
+
+                {filteredList.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
+                      {isEn ? 'No applications match your filter criteria' : 'Aucune demande ne correspond à vos critères'}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -610,7 +646,7 @@ export default function DemandesScreen({
           <div className="px-4 py-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>
               Showing <strong className="text-[#092342]">1–{Math.min(7, filteredList.length)}</strong> of{' '}
-              <strong className="text-[#092342]">90</strong> applications
+              <strong className="text-[#092342]">{totalCount}</strong> applications
             </span>
             <div className="flex items-center gap-1">
               <button
@@ -647,7 +683,7 @@ export default function DemandesScreen({
         </div>
 
         {/* Right Detail Inspector Drawer (5 cols on XL) */}
-        {selectedDemande && (
+        {selectedDemande ? (
           <div className="xl:col-span-5 rounded-2xl border border-[#e6eef6] bg-white p-5 shadow-card space-y-5">
             {/* Top Drawer Header */}
             <div className="flex items-center justify-between gap-2">
@@ -655,10 +691,10 @@ export default function DemandesScreen({
                 <span className="rounded-xl bg-[#6ee7b7] px-3 py-1 text-[11px] font-extrabold text-[#064e3b] leading-tight">
                   {selectedDemande.status === 'New' || selectedDemande.status === 'Nouvelle'
                     ? 'New Application'
-                    : selectedDemande.status}
+                    : selectedDemande.status || 'Active'}
                 </span>
                 <span className="text-xs font-extrabold text-[#092342]">
-                  {selectedDemande.ref.replace(/-[A-Z]$/, '')}
+                  {String(selectedDemande.ref || '').replace(/-[A-Z]$/, '')}
                 </span>
               </div>
               <div className="flex items-center gap-1 text-slate-400">
@@ -677,17 +713,17 @@ export default function DemandesScreen({
             {/* Candidate Identity Card */}
             <div className="rounded-2xl bg-[#f3f7fc] p-4 flex items-center gap-4">
               <div className="h-14 w-14 rounded-2xl bg-[#092342] text-white flex items-center justify-center text-lg font-extrabold shrink-0">
-                {selectedDemande.initials}
+                {selectedDemande.initials || '??'}
               </div>
               <div className="min-w-0">
                 <h2 className="text-lg font-extrabold text-[#092342] truncate">
-                  {selectedDemande.full_name}
+                  {selectedDemande.full_name || 'Sans nom'}
                 </h2>
                 <div className="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-[#0c685a]">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Qualified Candidate ({selectedDemande.country_name})</span>
+                  <span>Qualified Candidate ({selectedDemande.country_name || selectedDemande.country_code || 'RDC'})</span>
                 </div>
-                <p className="mt-1 text-[11px] text-slate-400">{selectedDemande.submitted_at}</p>
+                <p className="mt-1 text-[11px] text-slate-400">{selectedDemande.submitted_at || 'Récemment'}</p>
               </div>
             </div>
 
@@ -704,7 +740,7 @@ export default function DemandesScreen({
                   </span>
                   <div className="min-w-0">
                     <div className="text-xs font-extrabold text-[#092342]">
-                      {selectedDemande.phone}
+                      {selectedDemande.phone || '-'}
                     </div>
                     <div className="text-[10.5px] font-semibold text-[#0c685a]">
                       Active Verified WhatsApp
@@ -713,7 +749,7 @@ export default function DemandesScreen({
                 </div>
                 <button
                   onClick={() =>
-                    onNotify(`Opening WhatsApp chat with ${selectedDemande.full_name}...`)
+                    onNotify(`Opening WhatsApp chat with ${selectedDemande.full_name || 'candidate'}...`)
                   }
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[#0c6358] hover:bg-[#094e45] px-3 py-1.5 text-[11px] font-bold text-white shrink-0 transition"
                 >
@@ -729,15 +765,17 @@ export default function DemandesScreen({
                   </span>
                   <div className="min-w-0">
                     <div className="text-xs font-extrabold text-[#092342] truncate">
-                      {selectedDemande.email}
+                      {selectedDemande.email || '-'}
                     </div>
-                    <div className="text-[10.5px] text-slate-400">{selectedDemande.city}</div>
+                    <div className="text-[10.5px] text-slate-400">{selectedDemande.city || '-'}</div>
                   </div>
                 </div>
                 <button
                   onClick={() => {
-                    navigator.clipboard?.writeText(selectedDemande.email);
-                    onNotify('Email address copied to clipboard.');
+                    if (selectedDemande.email && typeof navigator !== 'undefined' && navigator.clipboard) {
+                      navigator.clipboard.writeText(selectedDemande.email).catch(() => {});
+                      onNotify('Email address copied to clipboard.');
+                    }
                   }}
                   className="p-1.5 rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"
                 >
@@ -749,26 +787,26 @@ export default function DemandesScreen({
             {/* Study Project & Financing */}
             <div className="space-y-2.5">
               <h3 className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
-                STUDY PROJECT & FINANCING
+                STUDY PROJECT &amp; FINANCING
               </h3>
 
               <div className="rounded-2xl bg-[#f3f7fc] p-4 space-y-2.5 text-xs">
                 <div className="grid grid-cols-12 gap-2">
                   <span className="col-span-4 text-slate-400 font-medium">Desired Program</span>
                   <span className="col-span-8 font-extrabold text-[#092342]">
-                    {selectedDemande.program}
+                    {selectedDemande.program || '-'}
                   </span>
                 </div>
                 <div className="grid grid-cols-12 gap-2">
                   <span className="col-span-4 text-slate-400 font-medium">Target Cities</span>
                   <span className="col-span-8 font-semibold text-slate-700">
-                    {selectedDemande.target_cities}
+                    {selectedDemande.target_cities || 'Lyon (Exclusivement)'}
                   </span>
                 </div>
                 <div className="grid grid-cols-12 gap-2">
                   <span className="col-span-4 text-slate-400 font-medium">Current Level</span>
                   <span className="col-span-8 font-semibold text-slate-700">
-                    {selectedDemande.current_level}
+                    {selectedDemande.current_level || '-'}
                   </span>
                 </div>
 
@@ -779,7 +817,7 @@ export default function DemandesScreen({
                     Annual Budget
                   </span>
                   <span className="text-sm font-extrabold text-[#0c685a]">
-                    {selectedDemande.budget_range}
+                    {selectedDemande.budget_range || '-'}
                   </span>
                 </div>
               </div>
@@ -790,7 +828,7 @@ export default function DemandesScreen({
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#0c685a]">
-                    PARENT LINK & ACADEMIC BACKGROUND
+                    PARENT LINK &amp; ACADEMIC BACKGROUND
                   </h3>
                   <span className="text-[10px] font-extrabold text-[#0c685a] bg-[#eefaf6] px-2 py-0.5 rounded-md border border-[#ccece2]">
                     Linked
@@ -846,7 +884,7 @@ export default function DemandesScreen({
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
-                  INTERNAL AUDIT LOG & NOTES
+                  INTERNAL AUDIT LOG &amp; NOTES
                 </h3>
                 <span className="text-[11px] font-extrabold text-[#092342]">
                   {selectedNotes.length} notes
@@ -854,19 +892,25 @@ export default function DemandesScreen({
               </div>
 
               <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                {selectedNotes.map((note) => (
-                  <div key={note.id} className="rounded-xl bg-[#f3f7fc] p-3 text-xs">
+                {selectedNotes.map((note, idx) => (
+                  <div key={note.id || `note-${idx}`} className="rounded-xl bg-[#f3f7fc] p-3 text-xs">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-extrabold text-[#092342] text-[11px]">
-                        {note.author}
+                        {note.author || 'Conseiller'}
                       </span>
-                      <span className="text-[10px] text-slate-400">{note.timestamp_label}</span>
+                      <span className="text-[10px] text-slate-400">{note.timestamp_label || 'Aujourd’hui'}</span>
                     </div>
                     <p className="mt-1.5 text-[11.5px] text-slate-600 leading-relaxed">
                       {note.content}
                     </p>
                   </div>
                 ))}
+
+                {selectedNotes.length === 0 && (
+                  <div className="rounded-xl bg-[#f3f7fc] p-3 text-center text-slate-400 text-xs">
+                    {isEn ? 'No notes for this application' : 'Aucune note pour cette demande'}
+                  </div>
+                )}
               </div>
 
               <form onSubmit={handleSendNote} className="relative">
@@ -874,7 +918,7 @@ export default function DemandesScreen({
                   type="text"
                   value={noteInput}
                   onChange={(e) => setNoteInput(e.target.value)}
-                  placeholder="Add internal follow-up note..."
+                  placeholder={isEn ? 'Add internal follow-up note...' : 'Ajouter une note de suivi interne...'}
                   className="w-full rounded-xl bg-[#f1f6fb] pl-3.5 pr-10 py-2.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#092342]/20"
                 />
                 <button
@@ -906,7 +950,7 @@ export default function DemandesScreen({
                 <button
                   onClick={() =>
                     onNotify(
-                      `Orientation meeting scheduled with ${selectedDemande.full_name}.`
+                      `Orientation meeting scheduled with ${selectedDemande.full_name || 'candidate'}.`
                     )
                   }
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#f1f6fb] hover:bg-slate-200/70 py-2.5 px-3 text-xs font-bold text-[#092342] transition"
@@ -923,6 +967,10 @@ export default function DemandesScreen({
                 </button>
               </div>
             </div>
+          </div>
+        ) : (
+          <div className="xl:col-span-5 rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-slate-400 text-xs">
+            {isEn ? 'Select an application from the table to inspect details' : 'Sélectionnez une demande dans la liste pour afficher ses détails'}
           </div>
         )}
       </div>

@@ -33,6 +33,7 @@ import DemandesScreen from '@/components/DemandesScreen';
 import ProspectsScreen from '@/components/ProspectsScreen';
 import CandidatsScreen from '@/components/CandidatsScreen';
 import AccommodationScreen from '@/components/AccommodationScreen';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
   PrepaScreen,
   ServicesAviScreen,
@@ -1153,7 +1154,8 @@ export default function LiecWorkspacePage() {
               )}
 
               {activeTab === 'demandes' && (
-                <DemandesScreen
+                <ErrorBoundary fallbackTitle={isEn ? 'Error loading Received Applications' : "Erreur d'affichage des Demandes reçues"} onReset={fetchWorkspace}>
+                  <DemandesScreen
                   demandes={demandes}
                   demandeNotes={demandeNotes}
                   selectedRef={selectedDemandeRef}
@@ -1166,7 +1168,8 @@ export default function LiecWorkspacePage() {
                   onRefresh={fetchWorkspace}
                   onNotify={showToast}
                   lang={lang}
-                />
+                  />
+                </ErrorBoundary>
               )}
 
               {activeTab === 'prospects' && (
