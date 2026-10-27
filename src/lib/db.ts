@@ -1486,9 +1486,11 @@ async function createDBClient(): Promise<DBClient> {
   const dbUrl = process.env.DATABASE_URL;
   if (dbUrl && process.env.FORCE_PGLITE !== 'true') {
     try {
+      const isLocalhost = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
       const pool = new Pool({
         connectionString: dbUrl,
-        connectionTimeoutMillis: 1500,
+        connectionTimeoutMillis: 8000,
+        ssl: isLocalhost ? false : { rejectUnauthorized: false },
       });
       await pool.query('SELECT 1');
       const pgClient: DBClient = {
@@ -1502,9 +1504,11 @@ async function createDBClient(): Promise<DBClient> {
         },
       };
       await initSchemaAndSeed(pgClient);
+      console.log('[DB] Successfully connected to external PostgreSQL server via DATABASE_URL.');
       return pgClient;
-    } catch {
-      // Fallback transparently to embedded PostgreSQL (PGlite)
+    } catch (err: any) {
+      console.warn('[DB] Could not connect to external PostgreSQL via DATABASE_URL:', err?.message || err);
+      console.warn('[DB] Falling back to embedded PGlite instance.');
     }
   }
 
