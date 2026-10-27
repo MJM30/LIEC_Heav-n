@@ -51,8 +51,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Validate that the accommodation request exists
-    const accRes = await db.query('SELECT * FROM accommodation_requests WHERE ref = $1', [ref]);
-    if (accRes.rowCount === 0) {
+    const cleanRef = ref.startsWith('#') ? ref : `#${ref}`;
+    const accRes = await db.query(
+      'SELECT * FROM accommodation_requests WHERE ref = $1 OR ref = $2 OR LOWER(ref) = LOWER($1)',
+      [ref, cleanRef]
+    );
+    if (!accRes.rows || accRes.rows.length === 0) {
       return NextResponse.json(
         { error: `Accommodation request ${ref} does not exist.` },
         { status: 404 }
@@ -77,8 +81,12 @@ export async function POST(req: NextRequest) {
 
     // 2. Validate that it is linked to the correct Student Record
     const studentRef = accRecord.student_ref;
-    const studentRes = await db.query('SELECT * FROM candidats WHERE ref = $1', [studentRef]);
-    if (studentRes.rowCount === 0) {
+    const cleanStudentRef = studentRef && studentRef.startsWith('#') ? studentRef : `#${studentRef}`;
+    const studentRes = await db.query(
+      'SELECT * FROM candidats WHERE ref = $1 OR ref = $2 OR LOWER(ref) = LOWER($1)',
+      [studentRef, cleanStudentRef]
+    );
+    if (!studentRes.rows || studentRes.rows.length === 0) {
       return NextResponse.json(
         {
           error: `Integrity error: Linked student record (${studentRef}) could not be found in the database.`,

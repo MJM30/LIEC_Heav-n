@@ -1586,7 +1586,11 @@ async function createDBClient(): Promise<DBClient> {
         engine: 'pg',
         async query<T = any>(sql: string, params?: any[]): Promise<QueryResult<T>> {
           const res = await pool.query(sql, params);
-          return { rows: res.rows as T[], rowCount: res.rowCount };
+          const rowCount =
+            typeof res.rowCount === 'number'
+              ? res.rowCount
+              : (res.rows && res.rows.length > 0 ? res.rows.length : 0);
+          return { rows: res.rows as T[], rowCount };
         },
         async exec(sql: string): Promise<void> {
           await pool.query(sql);
@@ -1639,7 +1643,11 @@ async function createDBClient(): Promise<DBClient> {
     engine: 'pglite',
     async query<T = any>(sql: string, params?: any[]): Promise<QueryResult<T>> {
       const res = await (pglite as any).query(sql, params);
-      return { rows: res.rows as T[], rowCount: res.affectedRows ?? res.rows.length };
+      const rowCount =
+        res.rows && res.rows.length > 0
+          ? res.rows.length
+          : (typeof res.affectedRows === 'number' ? res.affectedRows : 0);
+      return { rows: res.rows as T[], rowCount };
     },
     async exec(sql: string): Promise<void> {
       await pglite.exec(sql);

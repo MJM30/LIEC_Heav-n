@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     let ref = `#DEM-2025-${String(nextNum).padStart(3, '0')}`;
     while (true) {
       const existing = await db.query('SELECT 1 FROM demandes WHERE ref = $1', [ref]);
-      if (existing.rowCount === 0) break;
+      if (!existing.rows || existing.rows.length === 0) break;
       nextNum++;
       ref = `#DEM-2025-${String(nextNum).padStart(3, '0')}`;
     }
@@ -245,7 +245,7 @@ export async function PATCH(req: NextRequest) {
       let canRef = `#CAN-2025-${String(nextCanNum).padStart(3, '0')}`;
       while (true) {
         const existingCan = await db.query('SELECT 1 FROM candidats WHERE ref = $1', [canRef]);
-        if (existingCan.rowCount === 0) break;
+        if (!existingCan.rows || existingCan.rows.length === 0) break;
         nextCanNum++;
         canRef = `#CAN-2025-${String(nextCanNum).padStart(3, '0')}`;
       }

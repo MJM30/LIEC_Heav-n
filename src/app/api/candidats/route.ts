@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
     let ref = `#CAN-2025-${String(nextNum).padStart(3, '0')}`;
     while (true) {
       const existingCan = await db.query('SELECT 1 FROM candidats WHERE ref = $1', [ref]);
-      if (existingCan.rowCount === 0) break;
+      if (!existingCan.rows || existingCan.rows.length === 0) break;
       nextNum++;
       ref = `#CAN-2025-${String(nextNum).padStart(3, '0')}`;
     }
@@ -349,8 +349,12 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Candidate reference (ref) is required.' }, { status: 400, headers: corsHeaders() });
     }
 
-    const existingRes = await db.query('SELECT * FROM candidats WHERE ref = $1', [ref]);
-    if (existingRes.rowCount === 0) {
+    const cleanRef = ref.startsWith('#') ? ref : `#${ref}`;
+    const existingRes = await db.query(
+      'SELECT * FROM candidats WHERE ref = $1 OR ref = $2 OR LOWER(ref) = LOWER($1)',
+      [ref, cleanRef]
+    );
+    if (!existingRes.rows || existingRes.rows.length === 0) {
       return NextResponse.json({ error: `Candidate ${ref} not found.` }, { status: 404, headers: corsHeaders() });
     }
     const cand = existingRes.rows[0];
@@ -534,8 +538,12 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Candidate reference (ref) is required.' }, { status: 400, headers: corsHeaders() });
     }
 
-    const candRes = await db.query('SELECT * FROM candidats WHERE ref = $1', [ref]);
-    if (candRes.rowCount === 0) {
+    const cleanRef = ref.startsWith('#') ? ref : `#${ref}`;
+    const candRes = await db.query(
+      'SELECT * FROM candidats WHERE ref = $1 OR ref = $2 OR LOWER(ref) = LOWER($1)',
+      [ref, cleanRef]
+    );
+    if (!candRes.rows || candRes.rows.length === 0) {
       return NextResponse.json({ error: `Candidate ${ref} not found.` }, { status: 404, headers: corsHeaders() });
     }
     const cand = candRes.rows[0];
@@ -544,16 +552,16 @@ export async function DELETE(req: NextRequest) {
     const [aviCheck, accCheck] = await Promise.all([
       db.query(
         'SELECT ref, status FROM avi_requests WHERE student_ref = $1 OR student_name ILIKE $2',
-        [ref, `%${cand.full_name}%`]
+        [cand.ref, `%${cand.full_name}%`]
       ),
       db.query(
         'SELECT ref, status FROM accommodation_requests WHERE student_ref = $1',
-        [ref]
+        [cand.ref]
       ),
     ]);
 
-    const linkedAviCount = aviCheck.rowCount || 0;
-    const linkedAccCount = accCheck.rowCount || 0;
+    const linkedAviCount = aviCheck.rows?.length ?? 0;
+    const linkedAccCount = accCheck.rows?.length ?? 0;
 
     if ((linkedAviCount > 0 || linkedAccCount > 0) && !forceCascade) {
       const linkedRefs = [
@@ -609,7 +617,11 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { ref, action } = body;
 
-    const res = await db.query('SELECT * FROM candidats WHERE ref = $1', [ref]);
+    const cleanRef = ref && ref.startsWith('#') ? ref : `#${ref}`;
+    const res = await db.query(
+      'SELECT * FROM candidats WHERE ref = $1 OR ref = $2 OR LOWER(ref) = LOWER($1)',
+      [ref, cleanRef]
+    );
     const cand = res.rows[0];
     if (!cand) {
       return NextResponse.json({ error: 'Candidat introuvable' }, { status: 404, headers: corsHeaders() });

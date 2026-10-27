@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     let ref = `AVI-2025-${String(nextNum).padStart(3, '0')}`;
     while (true) {
       const existing = await db.query('SELECT 1 FROM avi_requests WHERE ref = $1', [ref]);
-      if (existing.rowCount === 0) break;
+      if (!existing.rows || existing.rows.length === 0) break;
       nextNum++;
       ref = `AVI-2025-${String(nextNum).padStart(3, '0')}`;
     }

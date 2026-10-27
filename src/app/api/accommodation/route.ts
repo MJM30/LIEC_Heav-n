@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
     let ref = `#ACC-${year}-${String(nextNum).padStart(3, '0')}`;
     while (true) {
       const existing = await db.query('SELECT 1 FROM accommodation_requests WHERE ref = $1', [ref]);
-      if (existing.rowCount === 0) break;
+      if (!existing.rows || existing.rows.length === 0) break;
       nextNum++;
       ref = `#ACC-${year}-${String(nextNum).padStart(3, '0')}`;
     }
@@ -237,8 +237,12 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Request reference (ref) is required.' }, { status: 400 });
     }
 
-    const existingRes = await db.query('SELECT * FROM accommodation_requests WHERE ref = $1', [ref]);
-    if (existingRes.rowCount === 0) {
+    const cleanRef = ref.startsWith('#') ? ref : `#${ref}`;
+    const existingRes = await db.query(
+      'SELECT * FROM accommodation_requests WHERE ref = $1 OR ref = $2 OR LOWER(ref) = LOWER($1)',
+      [ref, cleanRef]
+    );
+    if (!existingRes.rows || existingRes.rows.length === 0) {
       return NextResponse.json({ error: `Request ${ref} not found.` }, { status: 404 });
     }
     const existing = existingRes.rows[0];
@@ -365,8 +369,12 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Request reference is required.' }, { status: 400 });
     }
 
-    const check = await db.query('SELECT * FROM accommodation_requests WHERE ref = $1', [ref]);
-    if (check.rowCount === 0) {
+    const cleanRef = ref.startsWith('#') ? ref : `#${ref}`;
+    const check = await db.query(
+      'SELECT * FROM accommodation_requests WHERE ref = $1 OR ref = $2 OR LOWER(ref) = LOWER($1)',
+      [ref, cleanRef]
+    );
+    if (!check.rows || check.rows.length === 0) {
       return NextResponse.json({ error: `Request ${ref} not found.` }, { status: 404 });
     }
 
