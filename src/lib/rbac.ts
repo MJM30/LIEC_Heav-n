@@ -226,6 +226,7 @@ export type SecuredModule =
   | 'avi'
   | 'finance'
   | 'yimmiline'
+  | 'accommodation'
   | 'audit'
   | 'users_roles_config'
   | 'reports';
@@ -301,6 +302,7 @@ export function evaluateModuleAccess(
       case 'prepa':
       case 'reports':
       case 'avi':
+      case 'accommodation':
         return { allowed: true, scope: 'intake_administrative' };
       case 'yimmiline':
       case 'finance':
@@ -326,6 +328,27 @@ export function evaluateModuleAccess(
     scope: 'denied',
     reason: 'Access denied: No role or permission matched. Denied by default.',
   };
+}
+
+/**
+ * Checks if user is permitted to trigger accommodation partner email dispatch.
+ * Strictly limited to Admin and Secretary. AVI Officer is prohibited.
+ */
+export function canSendAccommodationRequest(user: AuthenticatedUserContext): boolean {
+  if (!user || !user.active) return false;
+  const profile = user.business_profile;
+  const userRole = (user as any).role;
+  const roles = user.technical_roles || [];
+
+  return (
+    profile === 'Admin' ||
+    userRole === 'admin' ||
+    roles.includes('admin') ||
+    roles.includes('lh_security_admin') ||
+    profile === 'Secretary' ||
+    roles.includes('lh_internal') ||
+    roles.includes('ITIL')
+  );
 }
 
 /**

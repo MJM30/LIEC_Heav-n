@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       usersRes,
       rolesRes,
       parentLinksRes,
+      accRes,
     ] = await Promise.all([
       db.query('SELECT * FROM demandes ORDER BY id DESC'),
       db.query('SELECT * FROM demande_notes ORDER BY id ASC'),
@@ -45,6 +46,7 @@ export async function GET(req: NextRequest) {
       db.query('SELECT id, name, email, business_profile, role, title, initials, active, suspended_at, suspended_by, created_at FROM users ORDER BY id ASC'),
       db.query('SELECT * FROM roles ORDER BY id ASC'),
       db.query('SELECT * FROM parent_student_links ORDER BY parent_name ASC, student_name ASC'),
+      db.query('SELECT * FROM accommodation_requests ORDER BY id DESC'),
     ]);
 
     // Parse JSON fields on candidats
@@ -54,6 +56,13 @@ export async function GET(req: NextRequest) {
       voeux: JSON.parse(row.voeux_json || '[]'),
       notes: JSON.parse(row.notes_json || '[]'),
       pieces: JSON.parse(row.pieces_json || '[]'),
+      history: JSON.parse(row.history_json || '[]'),
+    }));
+
+    // Parse JSON fields on accommodation requests
+    const parsedAccommodation = accRes.rows.map((row: any) => ({
+      ...row,
+      history: JSON.parse(row.history_json || '[]'),
     }));
 
     // Apply Access Matrix according to PDF Section 3
@@ -68,6 +77,7 @@ export async function GET(req: NextRequest) {
     let filteredTasks = tasksRes.rows;
     let filteredPrepaCohorts = prepaRes.rows;
     let filteredParentLinks = parentLinksRes.rows;
+    let filteredAccommodation = parsedAccommodation;
 
     if (profile === 'Secretary') {
       // Secretary: Denied by default from General Finance & Audit
@@ -116,6 +126,7 @@ export async function GET(req: NextRequest) {
       users: filteredUsers,
       roles: filteredRoles,
       parentStudentLinks: filteredParentLinks,
+      accommodationRequests: filteredAccommodation,
     });
   } catch (error: any) {
     console.error('Error in workspace RBAC query:', error);

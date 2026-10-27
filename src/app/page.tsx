@@ -25,12 +25,14 @@ import {
   Sun,
   Moon,
   Globe,
+  Home,
 } from 'lucide-react';
 
 import OverviewScreen from '@/components/OverviewScreen';
 import DemandesScreen from '@/components/DemandesScreen';
 import ProspectsScreen from '@/components/ProspectsScreen';
 import CandidatsScreen from '@/components/CandidatsScreen';
+import AccommodationScreen from '@/components/AccommodationScreen';
 import {
   PrepaScreen,
   ServicesAviScreen,
@@ -47,6 +49,7 @@ type NavTab =
   | 'candidats'
   | 'prepa'
   | 'services'
+  | 'accommodation'
   | 'contenus'
   | 'rapports'
   | 'notifications'
@@ -60,6 +63,7 @@ const TAB_LABELS_EN: Record<NavTab, string> = {
   candidats: 'Candidates & Files',
   prepa: 'PREPA Enrollments',
   services: 'AVI Financing Desk',
+  accommodation: 'Accommodation Reservations',
   contenus: 'Public Portal Intake',
   rapports: 'Finance & Analytics',
   notifications: 'Notifications',
@@ -74,6 +78,7 @@ const TAB_LABELS_FR: Record<NavTab, string> = {
   candidats: 'Candidats',
   prepa: 'Inscriptions PREPA',
   services: 'Guichet Financement AVI',
+  accommodation: 'Réservations Logement',
   contenus: 'Contenus du site',
   rapports: 'Rapports & stats',
   notifications: 'Notifications',
@@ -110,6 +115,7 @@ export default function LiecWorkspacePage() {
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
+  const [accommodationRequests, setAccommodationRequests] = useState<any[]>([]);
 
   const [selectedDemandeRef, setSelectedDemandeRef] = useState('#DEM-2025-089');
   const [selectedCandidatRef, setSelectedCandidatRef] = useState('#CAN-2025-042');
@@ -156,6 +162,7 @@ export default function LiecWorkspacePage() {
           'candidats',
           'prepa',
           'services',
+          'accommodation',
           'contenus',
           'notifications',
           'aide',
@@ -210,6 +217,7 @@ export default function LiecWorkspacePage() {
       if (data.users) setUsers(data.users);
       if (data.roles) setRoles(data.roles);
       if (data.parentStudentLinks) setParentStudentLinks(data.parentStudentLinks);
+      if (data.accommodationRequests) setAccommodationRequests(data.accommodationRequests);
     } catch (err) {
       console.error('Failed to fetch workspace:', err);
     } finally {
@@ -732,6 +740,7 @@ export default function LiecWorkspacePage() {
       badgeTone: 'gold',
     },
     { id: 'services', label: tabLabels.services, icon: Share2 },
+    { id: 'accommodation', label: tabLabels.accommodation, icon: Home },
     { id: 'contenus', label: tabLabels.contenus, icon: FileText },
     { id: 'rapports', label: tabLabels.rapports, icon: BarChart3 },
   ];
@@ -1183,6 +1192,19 @@ export default function LiecWorkspacePage() {
                   onTogglePiece={handleToggleCandidatPiece}
                   onNotify={showToast}
                   lang={lang}
+                  aviRequests={aviRequests}
+                  accommodationRequests={accommodationRequests}
+                  currentRole={rolePreview}
+                  currentUser={currentUser}
+                  onRefresh={fetchWorkspace}
+                  onOpenAviCreation={(studentRef) => {
+                    setSelectedCandidatRef(studentRef);
+                    setActiveTab('services');
+                  }}
+                  onOpenAccommodationCreation={(studentRef) => {
+                    setSelectedCandidatRef(studentRef);
+                    setActiveTab('accommodation');
+                  }}
                 />
               )}
 
@@ -1205,6 +1227,22 @@ export default function LiecWorkspacePage() {
                   parentStudentLinks={parentStudentLinks}
                   demandes={demandes}
                   candidats={candidats}
+                />
+              )}
+
+              {activeTab === 'accommodation' && (
+                <AccommodationScreen
+                  accommodationRequests={accommodationRequests}
+                  candidats={candidats}
+                  currentRole={rolePreview}
+                  currentUser={currentUser}
+                  onRefresh={fetchWorkspace}
+                  onSelectStudentRef={(ref) => {
+                    setSelectedCandidatRef(ref);
+                    setActiveTab('candidats');
+                  }}
+                  onNotify={showToast}
+                  lang={lang}
                 />
               )}
 

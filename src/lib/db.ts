@@ -692,6 +692,41 @@ async function initSchemaAndSeed(client: DBClient) {
       details TEXT,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS accommodation_requests (
+      id SERIAL PRIMARY KEY,
+      ref VARCHAR(50) UNIQUE NOT NULL,
+      student_ref VARCHAR(50) NOT NULL,
+      student_name VARCHAR(150) NOT NULL,
+      student_email VARCHAR(160),
+      student_phone VARCHAR(60),
+      student_nationality VARCHAR(100),
+      student_location VARCHAR(120),
+      parent_name VARCHAR(150),
+      parent_phone VARCHAR(60),
+      parent_email VARCHAR(160),
+      parent_relation VARCHAR(60) DEFAULT 'Parent / Tuteur',
+      admission_status VARCHAR(100) DEFAULT 'Admitted — Partner School Lyon',
+      procedure_status VARCHAR(100) DEFAULT 'Milestone 2 — Academic Records',
+      preferred_location VARCHAR(150) NOT NULL,
+      accommodation_type VARCHAR(100) NOT NULL,
+      arrival_date VARCHAR(40) NOT NULL,
+      departure_date VARCHAR(40),
+      budget VARCHAR(80) NOT NULL,
+      special_requirements TEXT,
+      supporting_docs TEXT DEFAULT '',
+      status VARCHAR(50) NOT NULL DEFAULT 'Draft',
+      assigned_agent VARCHAR(120) NOT NULL DEFAULT 'Sarah Mwamba',
+      notes TEXT,
+      history_json TEXT NOT NULL DEFAULT '[]',
+      email_sent_at TIMESTAMP WITH TIME ZONE,
+      email_sent_by VARCHAR(120),
+      email_recipient VARCHAR(160),
+      email_status VARCHAR(50),
+      email_error TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Ensure RBAC schema columns and tables exist
@@ -803,6 +838,16 @@ async function initSchemaAndSeed(client: DBClient) {
     ALTER TABLE candidats ADD COLUMN IF NOT EXISTS graduation_year VARCHAR(10);
     ALTER TABLE candidats ADD COLUMN IF NOT EXISTS current_activity VARCHAR(25);
     ALTER TABLE candidats ADD COLUMN IF NOT EXISTS final_year_university VARCHAR(10);
+    ALTER TABLE candidats ADD COLUMN IF NOT EXISTS parent_email VARCHAR(160);
+    ALTER TABLE candidats ADD COLUMN IF NOT EXISTS parent_relation VARCHAR(60) DEFAULT 'Parent';
+    ALTER TABLE candidats ADD COLUMN IF NOT EXISTS admission_status VARCHAR(100) DEFAULT 'Admitted - Partner School Lyon';
+    ALTER TABLE candidats ADD COLUMN IF NOT EXISTS procedure_status VARCHAR(100) DEFAULT 'In Progress (Milestone 2)';
+    ALTER TABLE candidats ADD COLUMN IF NOT EXISTS description TEXT;
+    ALTER TABLE candidats ADD COLUMN IF NOT EXISTS comments TEXT;
+    ALTER TABLE candidats ADD COLUMN IF NOT EXISTS history_json TEXT DEFAULT '[]';
+
+    ALTER TABLE avi_requests ADD COLUMN IF NOT EXISTS student_ref VARCHAR(50);
+    UPDATE avi_requests SET student_ref = '#CAN-2025-042' WHERE student_name ILIKE '%Kabangele%' AND (student_ref IS NULL OR student_ref = '');
 
     CREATE TABLE IF NOT EXISTS parent_student_links (
       id SERIAL PRIMARY KEY,
@@ -840,6 +885,50 @@ async function initSchemaAndSeed(client: DBClient) {
     WHERE (LOWER(u.email) LIKE '%sarah%' OR LOWER(u.email) LIKE '%admin%')
     ON CONFLICT (user_id, role_id) DO NOTHING;
   `);
+
+  // Ensure initial Accommodation sample exists
+  try {
+    const checkAcc = await client.query<{ count: string | number }>(
+      `SELECT COUNT(*) as count FROM accommodation_requests`
+    );
+    if (Number(checkAcc.rows[0]?.count ?? 0) === 0) {
+      await client.exec(`
+        INSERT INTO accommodation_requests (
+          ref, student_ref, student_name, student_email, student_phone, student_nationality, student_location,
+          parent_name, parent_phone, parent_email, parent_relation, admission_status, procedure_status,
+          preferred_location, accommodation_type, arrival_date, departure_date, budget, special_requirements,
+          supporting_docs, status, assigned_agent, notes, history_json
+        ) VALUES (
+          '#ACC-2025-001',
+          '#CAN-2025-042',
+          'Dieudonné KABANGELE',
+          'd.kabangele@unikin.ac.cd',
+          '+243 81 552 1904',
+          'Congolaise (RDC)',
+          'RDC (Kinshasa)',
+          'Jean-Pierre Kabangele',
+          '+243 81 900 12 34',
+          'jp.kabangele@gmail.com',
+          'Father',
+          'Admitted — MyDigitalSchool Lyon',
+          'Milestone 2 — Academic Records',
+          'Lyon 7e (Jean Macé / Guillotière)',
+          'Studio Meublé (Résidence Étudiante)',
+          '2025-09-01',
+          '2026-06-30',
+          '550 € / month',
+          'High-speed WiFi for web development coursework, near Metro B or Tram T2, quiet environment.',
+          'ID Passport DRC, Admission Attestation MDS Lyon, Garant Income Proof',
+          'Draft',
+          'Sarah Mwamba',
+          'Initial draft prepared following Milestone 1 validation. Ready for partner dispatch upon final review.',
+          '[{"timestamp":"2025-10-20 14:30:00","author":"Sarah Mwamba (Admin)","action":"CREATED","details":"Accommodation request initiated from Student Record #CAN-2025-042."}]'
+        ) ON CONFLICT (ref) DO NOTHING;
+      `);
+    }
+  } catch (err) {
+    console.warn('Notice: accommodation seed check:', err);
+  }
 
   // Check if V4 English seed is already applied
   const checkV4 = await client.query<{ count: string | number }>(
