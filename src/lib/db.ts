@@ -505,17 +505,37 @@ async function initSchemaAndSeed(client: DBClient) {
     ON CONFLICT (user_id, role_id) DO NOTHING;
   `);
 }
+function getSafeDbInfo(rawUrl: string): { host: string; database: string } {
+  try {
+    const u = new URL(rawUrl);
+    return { host: u.host, database: u.pathname.replace(/^\//, '') || 'neondb' };
+  } catch {
+    return { host: 'unknown-host', database: 'unknown-db' };
+  }
+}
+
 async function createDBClient(): Promise<DBClient> {
-  const dbUrl = process.env.DATABASE_URL;
-  if (dbUrl && process.env.FORCE_PGLITE !== 'true') {
+  const directUrl = process.env.DATABASE_URL;
+  const pooledUrl = process.env.DATABASE_URL_POOLED;
+  const queryUrl = pooledUrl || directUrl;
+
+  if (queryUrl && process.env.FORCE_PGLITE !== 'true') {
     try {
-      const isLocalhost = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
+      const isLocalhost = queryUrl.includes('localhost') || queryUrl.includes('127.0.0.1');
+      const safeInfo = getSafeDbInfo(queryUrl);
+      const isPooled = Boolean(pooledUrl && queryUrl === pooledUrl);
+
       const pool = new Pool({
-        connectionString: dbUrl,
-        connectionTimeoutMillis: 8000,
+        connectionString: queryUrl,
+        connectionTimeoutMillis: 10000,
+        idleTimeoutMillis: 30000,
+        max: process.env.DB_POOL_MAX ? Number(process.env.DB_POOL_MAX) : 10,
         ssl: isLocalhost ? false : { rejectUnauthorized: false },
       });
+
       await pool.query('SELECT 1');
+      console.log(`[DB] Successfully connected to Neon PostgreSQL host: ${safeInfo.host} (database: ${safeInfo.database}) [mode: ${isPooled ? 'pooled' : 'direct'}]`);
+
       const pgClient: DBClient = {
         engine: 'pg',
         async query<T = any>(sql: string, params?: any[]): Promise<QueryResult<T>> {
@@ -530,11 +550,11 @@ async function createDBClient(): Promise<DBClient> {
           await pool.query(sql);
         },
       };
+
       await initSchemaAndSeed(pgClient);
-      console.log('[DB] Successfully connected to external PostgreSQL server via DATABASE_URL.');
       return pgClient;
     } catch (err: any) {
-      console.warn('[DB] Could not connect to external PostgreSQL via DATABASE_URL:', err?.message || err);
+      console.warn('[DB] Could not connect to external Neon PostgreSQL server:', err?.message || err);
       console.warn('[DB] Falling back to embedded PGlite instance.');
     }
   }
