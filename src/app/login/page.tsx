@@ -55,18 +55,13 @@ export default function LoginPage() {
   const OFFLINE_STAFF_CREDENTIALS = [
     {
       role: 'admin' as const,
-      email: 'admin@liec-education.com',
+      email: 'bmapwabantoro@liecconsulting.com',
       password: 'Admin@LIEC2026!',
     },
     {
-      role: 'secretary' as const,
-      email: 'secretary@liec-education.com',
-      password: 'Secretary@LIEC2026!',
-    },
-    {
-      role: 'avi' as const,
-      email: 'avi@liec-education.com',
-      password: 'AviOfficer@LIEC2026!',
+      role: 'admin' as const,
+      email: 'admin@liecconsulting.com',
+      password: 'Admin@LIEC2026!',
     },
   ];
 
@@ -114,30 +109,20 @@ export default function LoginPage() {
       const matched = OFFLINE_STAFF_CREDENTIALS.find(
         (t) =>
           (t.email.toLowerCase() === lower ||
-            (t.role === 'admin' && lower === 'sarah.mwamba@liec-education.com') ||
-            (t.role === 'secretary' && lower === 'marc.kouassi@liec-education.com') ||
-            (t.role === 'avi' && lower === 'alain.kanza@liec-education.com')) &&
+            lower === 'bmapwabantoro@liecconsulting.com' ||
+            lower === 'admin@liecconsulting.com' ||
+            lower === 'admin@liecconsulting.com') &&
           t.password === pass
       );
 
       if (matched) {
         const fallbackUser = {
-          id: matched.role === 'admin' ? 1 : matched.role === 'secretary' ? 2 : 3,
-          name:
-            matched.role === 'admin'
-              ? 'Sarah Mwamba'
-              : matched.role === 'secretary'
-              ? 'Marc Kouassi'
-              : 'Alain Kanza',
-          email: matched.email,
-          role: matched.role,
-          title:
-            matched.role === 'admin'
-              ? 'Senior Lyon Advisor & Platform Admin'
-              : matched.role === 'secretary'
-              ? 'DRC Admissions Secretary'
-              : 'Officier Financement AVI',
-          initials: matched.role === 'admin' ? 'SM' : matched.role === 'secretary' ? 'MK' : 'AK',
+          id: 1,
+          name: 'Barthelemy MAPWABA NTORO',
+          email: 'bmapwabantoro@liecconsulting.com',
+          role: 'admin',
+          title: 'Platform Administrator & Managing Director',
+          initials: 'BM',
         };
 
         localStorage.setItem('liec_user', JSON.stringify(fallbackUser));
@@ -808,7 +793,7 @@ export default function LoginPage() {
                       id="email"
                       name="email"
                       type="email"
-                      placeholder="you@liec-education.com"
+                      placeholder="you@liecconsulting.com"
                       autoComplete="username"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
